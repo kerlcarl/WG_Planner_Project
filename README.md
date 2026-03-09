@@ -1,42 +1,111 @@
-# WG_Planner_Project
-# WG-Planner: Finanzen & Ämtli-Management
+# WG‑Planner Project
+# WG‑Planner: Finances & Task Management
 
 ## 1. Projektbeschreibung
-Dieses Projekt wurde im Rahmen des Moduls Objektorientierte Programmierung (26FS) an der FHNW entwickelt. Der WG-Planner ist eine webbasierte Anwendung, die darauf abzielt, das Zusammenleben in einer Wohngemeinschaft zu organisieren und zu vereinfachen. Die App ermöglicht das Tracking von gemeinsamen Ausgaben sowie die Verwaltung eines digitalen Ämtliplan.
+Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasierte Anwendung zur koordinativen Unterstützung
+von Wohngemeinschaften (WG). Entwickelt im Rahmen des Moduls "Objektorientierte Programmierung" (26FS) an der FHNW,
+zielte das Projekt darauf ab, wiederkehrende Aufgaben und gemeinsame Ausgaben strukturiert zu verwalten.
 
-## 2. Projektziele & Funktionen
-**Finanz-Tracker:** Erfassung von Ausgaben und automatische Berechnung der Anteile pro Mitbewohner.
-**Ämtli-Kalender:** Zuweisung und Visualisierung von Haushaltsaufgaben für alle Teammitglieder.
-**Benutzerverwaltung:** Individuelle Profile für jeden WG-Bewohner.
-**Web-UI:** Intuitive Bedienung über eine moderne Browser-Oberfläche.
+Die Anwendung bietet Funktionen zum Protokollieren von Ausgaben, automatischem Ausgleich der Kostenanteile sowie
+einen rotierenden Aufgabenplan ("Ämtli").
+
+## 2. Ziele & Kernfunktionen
+Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen. Zu den
+wesentlichen Features gehören:
+
+1. **Shared‑Expense‑Tracker** – Erfassung gemeinsamer Ausgaben mit automatischer Aufteilung der Beträge
+	auf alle Bewohner.
+2. **Task‑Scheduler (Ämtli‑Plan)** – Zuweisung, Rotation und Statusverfolgung von Haushaltspflichten.
+3. **Benutzer­management** – Accounts mit Namen, Kennfarbe und optionalem Profilbild.
+4. **Responsive Web‑Frontend** – Bedienung im Browser; gestaltet mit NiceGUI.
 
 ## 3. Technische Architektur
-Die Anwendung folgt der im Modul vermittelten Softwarearchitektur:
-**Frontend (Präsentationsschicht):** Realisiert mit **NiceGUI**, ausgeführt im Browser als Thin Client.
-**Backend (Anwendungslogik):** Objektorientierte Programmierung in **Python** zur Abbildung der Businesslogik (Klassen für Bewohner, Ausgaben, Aufgaben).
-**Datenbank (Persistenzschicht):** Speicherung der Daten in **SQLite** unter Verwendung von **SQLAlchemy** als Object-Relational Mapper (ORM).
+Die Lösung ist als klassische Drei‑Schichten‑Architektur implementiert:
+
+* **Presentation Layer (Frontend)** – NiceGUI‑basierte Single‑Page‑Application, dient als Thin Client. Kommuniziert
+	per HTTP/WS mit dem Backend.
+* **Application Layer (Backend)** – Python‑Module enthalten die OOP‑Modelle (`User`, `Expense`, `Task` etc.) sowie
+	Service‑Klassen für Geschäftslogik und Routing (FastAPI/NiceGUI intern). Alle Endpunkte befinden sich
+	in `main.py` bzw. im Modul `api/`.
+* **Persistence Layer** – SQLite‑Datei (`wgplanner.db`) als lokale Datenbank; SQLAlchemy (Version 1.4.x) wird als ORM
+	genutzt. Modelle stehen in `models.py`.
+
+Ein einfaches Sequenzdiagramm:
+
+```
+Browser <--> NiceGUI Server (main.py) <--> SQLAlchemy <--> SQLite DB
+```
 
 ## 4. User Stories
-* *Als Mitbewohner möchte ich eine Ausgabe erfassen können, damit das System den Betrag gerecht auf alle aufteilt.*
-* *Als Mitbewohner möchte ich sehen, welches "Ämtli" mir diese Woche zugewiesen wurde, damit die WG sauber bleibt.*
-* *Als Admin der WG möchte ich neue Mitbewohner hinzufügen können, damit die Finanzberechnung aktuell bleibt.*
+Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folgen dem Format
+"Als [Rolle] möchte ich ... , damit ...". Akzeptanzkriterien sind bei Bedarf im Code/Issues dokumentiert.
+
+**Finanzen (Shared Expenses)**
+* Als Mitbewohner*in möchte ich eine Liste aller bisherigen Ausgaben sehen, um nachzuvollziehen, wofür Geld ausgegeben wurde.
+* Als Mitbewohner*in möchte ich den Schuldenstand zu anderen Personen sehen, um den Ausgleich zu planen.
+* Als Nutzer*in möchte ich Ausgaben Kategorien (Lebensmittel, Miete, Putzmittel etc.) zuordnen können, um Kostenstellen zu analysieren.
+
+**Ämtli & Organisation**
+* Als Mitbewohner*in möchte ich ein Ämtli als "erledigt" markieren können, damit andere den aktuellen Status sehen.
+* Die Aufgabenzuordnung soll sich wöchentlich rotieren, um die Last gerecht zu verteilen.
+* Als Mitbewohner*in möchte ich Aufgaben als "dringend" markieren können.
+
+**Administration & Profil**
+* Als Nutzer*in möchte ich meinen Namen und eine Kennfarbe definieren, damit meine Einträge in der UI eindeutig erkennbar sind.
+* Als WG möchte ich monatliche Statistiken (z. B. "Wer hat am meisten geputzt?") sehen.
+
+Ämtli & Organisation (Tasks)
+* *Aufgabenstatus aktualisieren: Als Mitbewohner möchte ich ein Ämtli als "erledigt" markieren können, damit die anderen sehen, dass die Aufgabe erledigt wurde.*
+* *Rotation der Aufgaben: Als WG möchte ich, dass die Ämtli wöchentlich automatisch zwischen den Bewohnern rotieren, damit die Last gerecht verteilt ist.*
+* *Priorisierung: Als Mitbewohner möchte ich Aufgaben als "dringend" markieren können (z. B. "Müll rausbringen"), um die Aufmerksamkeit des Zuständigen zu erhöhen.*
+
+Administration & ProfileProfil-Personalisierung
+* *Als Nutzer möchte ich meinen Namen und eine Kennfarbe festlegen können, damit meine Beiträge in der UI (NiceGUI) klar erkennbar sind.*
+* *WG-Statistiken: Als WG möchten wir eine monatliche Zusammenfassung sehen (z. B. "Wer hat am meisten geputzt?"), um das Gemeinschaftsgefühl oder die Disziplin zu fördern.*
 
 ## 5. Verwendete Bibliotheken & Tools
-**Python 3.x** 
-**NiceGUI** (Frontend-Framework)
-**SQLAlchemy** (Datenbank-ORM)
-**Pydantic** (Datenvalidierung)
-**Visual Studio Code** (Entwicklungsumgebung)
+* **Python 3.11** (minimal), getestet unter 3.11/3.12
+* **NiceGUI** 1.0.x – Frontend-Framework
+* **SQLAlchemy** 1.4.x – ORM
+* **Pydantic** 2.x – Validierung
+* **FastAPI** (als HTTP Server, via NiceGUI)
+* **pytest** – Testframework (falls vorhanden)
+* **black**, **flake8** – Formatierung & Linting
+* **SQLite** – eingebettete DB
+* **Visual Studio Code** – empfohlene IDE
+
+Versionen werden in `requirements.txt` festgehalten.
 
 ## 6. Arbeitsaufteilung (Initiales Konzept)
-Gemäss den Richtlinien ist jedes Teammitglied für einen substanziellen Teil des Codes verantwortlich. Die Beiträge werden über die GitHub-Commits validiert.
+Die Teamorganisation erfolgte über GitHub Issues/Projektboard; jeder Beitrag ist durch Commits und PRs
+nachvollziehbar. Beispielhafte Rollenverteilung:
 
-* **Mitglied 1:** Entwicklung der Datenmodelle (Klassen), Datenbank-Setup und SQLAlchemy-Integration
-* **Mitglied 2:** Gestaltung des User Interface (UI) mit NiceGUI und Verknüpfung der Frontend-Komponenten
-* **Mitglied 3:** Implementierung der Berechnungslogik (Finanz-Algorithmen) und der Ämtli-Verwaltungslogik
+* **Backend / Datenmodell** – Klassen, Datenbankmigration, ORM-Integration
+* **Frontend / UI** – NiceGUI-Layouts, Event-Handler, Client-seitige Logik
+* **Business-Logik** – Berechnungsalgorithmen (Finanzausgleich), Turnus-Mechanismus für Aufgaben
+
+Diese Gliederung hilft beim Review-Prozess und der Evaluierung durch Dozenten.
 
 ## 7. Installation & Ausführung
-1. Repository klonen.
-2. Abhängigkeiten installieren: `pip install nicegui sqlalchemy`.
-3. Anwendung starten: `python main.py`.
-4. Die App ist im Browser unter `http://localhost:8080` erreichbar.
+1. Repository klonen:
+	```bash
+	git clone https://github.com/kerlcarl/WG_Planner_Project.git
+	cd WG_Planner_Project
+	```
+2. Virtuelle Umgebung erstellen und aktivieren (empfohlen):
+	```bash
+	python -m venv .venv
+	source .venv/bin/activate
+	```
+3. Abhängigkeiten installieren:
+	```bash
+	pip install -r requirements.txt
+	```
+4. (Optional) Umgebungsvariablen setzen, z.B. `PORT=8000` oder `DATABASE_URL=sqlite:///wgplanner.db`.
+5. Anwendung starten:
+	```bash
+	python main.py
+	```
+6. Im Browser öffnen: `http://localhost:8080` (Standardport; konfigurierbar via `PORT`).
+
+Weitere Hinweise siehe Kommentarzeilen in `main.py`.
