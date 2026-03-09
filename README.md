@@ -11,10 +11,10 @@ Dieses Projekt wurde im Rahmen des Moduls Objektorientierte Programmierung (26FS
 **Web-UI:** Intuitive Bedienung über eine moderne Browser-Oberfläche.
 
 ## 3. Technische Architektur
-[cite_start]Die Anwendung folgt der im Modul vermittelten Softwarearchitektur[cite: 122]:
-* [cite_start]**Frontend (Präsentationsschicht):** Realisiert mit **NiceGUI**, ausgeführt im Browser als Thin Client[cite: 123, 126].
-* [cite_start]**Backend (Anwendungslogik):** Objektorientierte Programmierung in **Python** zur Abbildung der Businesslogik (Klassen für Bewohner, Ausgaben, Aufgaben)[cite: 128, 131].
-* [cite_start]**Datenbank (Persistenzschicht):** Speicherung der Daten in **SQLite** unter Verwendung von **SQLAlchemy** als Object-Relational Mapper (ORM)[cite: 132].
+Die Anwendung folgt der im Modul vermittelten Softwarearchitektur:
+**Frontend (Präsentationsschicht):** Realisiert mit **NiceGUI**, ausgeführt im Browser als Thin Client.
+**Backend (Anwendungslogik):** Objektorientierte Programmierung in **Python** zur Abbildung der Businesslogik (Klassen für Bewohner, Ausgaben, Aufgaben).
+**Datenbank (Persistenzschicht):** Speicherung der Daten in **SQLite** unter Verwendung von **SQLAlchemy** als Object-Relational Mapper (ORM).
 
 ## 4. User Stories
 * *Als Mitbewohner möchte ich eine Ausgabe erfassen können, damit das System den Betrag gerecht auf alle aufteilt.*
@@ -22,18 +22,18 @@ Dieses Projekt wurde im Rahmen des Moduls Objektorientierte Programmierung (26FS
 * *Als Admin der WG möchte ich neue Mitbewohner hinzufügen können, damit die Finanzberechnung aktuell bleibt.*
 
 ## 5. Verwendete Bibliotheken & Tools
-* [cite_start]**Python 3.x** [cite: 22]
-* [cite_start]**NiceGUI** (Frontend-Framework) [cite: 123]
-* [cite_start]**SQLAlchemy** (Datenbank-ORM) [cite: 32, 132]
-* [cite_start]**Pydantic** (Datenvalidierung) [cite: 27]
-* [cite_start]**Visual Studio Code** (Entwicklungsumgebung) [cite: 43]
+**Python 3.x** 
+**NiceGUI** (Frontend-Framework)
+**SQLAlchemy** (Datenbank-ORM)
+**Pydantic** (Datenvalidierung)
+**Visual Studio Code** (Entwicklungsumgebung)
 
 ## 6. Arbeitsaufteilung (Initiales Konzept)
-[cite_start]Gemäss den Richtlinien ist jedes Teammitglied für einen substanziellen Teil des Codes verantwortlich[cite: 109, 141]. [cite_start]Die Beiträge werden über die GitHub-Commits validiert[cite: 110, 142].
+Gemäss den Richtlinien ist jedes Teammitglied für einen substanziellen Teil des Codes verantwortlich. Die Beiträge werden über die GitHub-Commits validiert.
 
-* [cite_start]**Mitglied 1:** Entwicklung der Datenmodelle (Klassen), Datenbank-Setup und SQLAlchemy-Integration[cite: 132].
-* [cite_start]**Mitglied 2:** Gestaltung des User Interface (UI) mit NiceGUI und Verknüpfung der Frontend-Komponenten[cite: 128].
-* [cite_start]**Mitglied 3:** Implementierung der Berechnungslogik (Finanz-Algorithmen) und der Ämtli-Verwaltungslogik[cite: 131].
+* **Mitglied 1:** Entwicklung der Datenmodelle (Klassen), Datenbank-Setup und SQLAlchemy-Integration
+* **Mitglied 2:** Gestaltung des User Interface (UI) mit NiceGUI und Verknüpfung der Frontend-Komponenten
+* **Mitglied 3:** Implementierung der Berechnungslogik (Finanz-Algorithmen) und der Ämtli-Verwaltungslogik
 
 ## 7. Installation & Ausführung
 1. Repository klonen.
