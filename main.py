@@ -1,39 +1,43 @@
 from nicegui import ui
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
 
-# 1. Datenbank-Setup (Persistenzschicht)
-engine = create_engine('sqlite:///wg_planner.db')
-Base = declarative_base()
+from models import Expense, MitbewohnerDB, Session, Task
 
-class MitbewohnerDB(Base):
-    __tablename__ = 'mitbewohner'
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
 
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
+# Session-Factory (SQLAlchemy) wird in models.py initialisiert.
 session = Session()
 
 # 2. Logik-Klasse (Anwendungslogik / OOP)
-class WGManager:
-    def __init__(self):
-        self.titel = "Unser WG-Planner"
+def calculate_balances() -> dict[int, float]:
+    """Berechnet den Saldo (Zahlung minus Anteil) pro Nutzer."""
 
-    def bewohner_hinzufuegen(self, name):
-        if name:
-            neuer_bewohner = MitbewohnerDB(name=name)
-            session.add(neuer_bewohner)
-            session.commit()
-            ui.notify(f'{name} wurde hinzugefügt!')
-            self.liste_aktualisieren()
+    users = session.query(MitbewohnerDB).all()
+    balances = {u.id: 0.0 for u in users}
 
-    def liste_aktualisieren(self):
-        # Diese Funktion würde die UI-Liste neu laden
-        pass
+    for expense in session.query(Expense).all():
+        share = expense.split_per_person()
+        for user in expense.participants:
+            balances[user.id] -= share
+        balances[expense.paid_by_id] += expense.amount
 
-manager = WGManager()
+    return balances
+
+
+def rotate_tasks() -> None:
+    """Rotiert alle offenen Aufgaben zum nächsten Mitbewohner."""
+
+    users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.id).all()
+    if not users:
+        return
+
+    tasks = session.query(Task).filter_by(is_done=False).all()
+    for task in tasks:
+        if not task.assigned_to:
+            task.assigned_to = users[0]
+        else:
+            idx = next((i for i, u in enumerate(users) if u.id == task.assigned_to.id), 0)
+            task.assigned_to = users[(idx + 1) % len(users)]
+
+    session.commit()
 
 # 3. Frontend (Präsentationsschicht mit NiceGUI)
 def render_users_tab():
@@ -46,10 +50,11 @@ def render_users_tab():
     with ui.card().classes('w-full max-w-md q-ma-md'):
         ui.label('Aktuelle Bewohner*innen').classes('text-h6')
         for user in session.query(MitbewohnerDB).order_by(MitbewohnerDB.name):
-            ui.row([
-                ui.markdown(f'**{user.name}**'),
-                ui.label(user.color or '').classes('text-caption'),
-            ])
+            with ui.row().classes('items-center q-pa-sm'):
+                ui.markdown(f'**{user.name}**').classes('flex-grow')
+                ui.label(user.color or '').classes('text-caption q-mr-md')
+                ui.button('Bearbeiten', on_click=lambda u=user: edit_user(u)).props('flat dense')
+                ui.button('Löschen', on_click=lambda u=user: delete_user(u)).props('flat dense color-negative')
 
 
 def add_user(name: str, color: str | None = None) -> None:
@@ -64,18 +69,49 @@ def add_user(name: str, color: str | None = None) -> None:
     ui.reload()
 
 
+def edit_user(user: MitbewohnerDB):
+    with ui.dialog() as dialog:
+        ui.label(f'Bearbeite {user.name}').classes('text-h6')
+        name_input = ui.input(label='Name', value=user.name)
+        color_input = ui.input(label='Kennfarbe (Hex)', value=user.color or '')
+        with ui.row():
+            ui.button('Speichern', on_click=lambda: save_edit(user, name_input.value, color_input.value, dialog))
+            ui.button('Abbrechen', on_click=dialog.close)
+    dialog.open()
+
+
+def save_edit(user: MitbewohnerDB, name: str, color: str, dialog):
+    if not name:
+        ui.notify('Name erforderlich.', color='warning')
+        return
+    user.name = name.strip()
+    user.color = color.strip() if color else None
+    session.commit()
+    ui.notify('Gespeichert!')
+    dialog.close()
+    ui.reload()
+
+
+def delete_user(user: MitbewohnerDB):
+    session.delete(user)
+    session.commit()
+    ui.notify(f'{user.name} wurde gelöscht!')
+    ui.reload()
+
+
 def render_finances_tab():
     ui.label('Shared Expenses').classes('text-h5 q-mt-md')
 
     with ui.card().classes('w-full max-w-2xl q-ma-md'):
         ui.label('Neue Ausgabe erfassen').classes('text-h6')
         desc_input = ui.input(label='Beschreibung')
-        amount_input = ui.input(label='Betrag (CHF)', type='number')
+        amount_input = ui.number(label='Betrag (CHF)')
         category_input = ui.input(label='Kategorie (z. B. Lebensmittel)')
         paid_by_select = ui.select({u.name: u.id for u in session.query(MitbewohnerDB)}, label='Bezahlt von')
-        participants_multi = ui.multiselect(
+        participants_multi = ui.select(
             {u.name: u.id for u in session.query(MitbewohnerDB)},
-            label='Beteiligt'
+            label='Beteiligt',
+            multiple=True
         )
         ui.button('Speichern', on_click=lambda: add_expense(desc_input.value, amount_input.value, category_input.value, paid_by_select.value, participants_multi.value))
 
@@ -90,10 +126,9 @@ def render_finances_tab():
             ])
 
 
-def add_expense(description: str, amount: str, category: str, paid_by_id: int, participant_ids: list[int]):
-    try:
-        amount_value = float(amount)
-    except Exception:
+def add_expense(description: str, amount: float, category: str, paid_by_id: int, participant_ids: list[int]):
+    amount_value = amount
+    if not isinstance(amount_value, (int, float)) or amount_value <= 0:
         ui.notify('Ungültiger Betrag.', color='negative')
         return
 
@@ -173,18 +208,19 @@ def toggle_task_done(task: Task, done: bool):
 
 @ui.page('/')
 def main_page():
-    ui.label(manager.titel).classes('text-h3 q-ma-md')
-    
-    with ui.card().classes('w-full max-w-md q-ma-md'):
-        ui.label('Neuen Mitbewohner hinzufügen').classes('text-h6')
-        name_input = ui.input(label='Name')
-        ui.button('Hinzufügen', on_click=lambda: manager.bewohner_hinzufuegen(name_input.value))
+    ui.label('WG‑Planner').classes('text-h3 q-ma-md')
+    with ui.tabs() as tabs:
+        ui.tab('Mitbewohner')
+        ui.tab('Finanzen')
+        ui.tab('Ämtli')
 
-    ui.label('Aktuelle Bewohner:').classes('text-h6 q-ma-md')
-    # Hier werden die Bewohner aus der Datenbank angezeigt
-    bewohner = session.query(MitbewohnerDB).all()
-    for b in bewohner:
-        ui.label(f'• {b.name}')
+    with ui.tab_panels(tabs, value='Mitbewohner'):
+        with ui.tab_panel('Mitbewohner'):
+            render_users_tab()
+        with ui.tab_panel('Finanzen'):
+            render_finances_tab()
+        with ui.tab_panel('Ämtli'):
+            render_tasks_tab()
 
 # Startet die Anwendung
 # `show=False` verhindert, dass NiceGUI versucht, einen Browser zu öffnen.
