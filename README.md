@@ -6,13 +6,18 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 von Wohngemeinschaften (WG). Entwickelt im Rahmen des Moduls "Objektorientierte Programmierung" (26FS) an der FHNW,
 zielte das Projekt darauf ab, wiederkehrende Aufgaben und gemeinsame Ausgaben strukturiert zu verwalten.
 
-Die Anwendung bietet Funktionen zum Protokollieren von Ausgaben, automatischem Ausgleich der Kostenanteile sowie
-einen rotierenden Aufgabenplan ("Ämtli").
+Aktuell ist die Anwendung als MVP (Minimum Viable Product) am Start und bietet eine einfache
+Oberfläche zum Hinzufügen und Anzeigen von Mitbewohner*innen. Die geplanten Kernfunktionen
+umfassen später ein Shared‑Expense‑Tracking, einen rotierenden Ämtli‑Plan und ein Benutzerprofil‑System.
 
 ## 2. Ziele & Kernfunktionen
-Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen. Zu den
-wesentlichen Features gehören:
+Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen. Aktuell
+ist ein einfacher Mitbewohner‑Verwaltungsbildschirm implementiert; die folgenden Kernfunktionen sind geplant:
 
+### ✔ Aktuell implementiert
+* **Mitbewohner‑Liste** – Hinzufügen von Personen und Anzeige aller bisher eingetragenen Mitbewohner*innen.
+
+### 🚧 Geplante Kernfunktionen
 1. **Shared‑Expense‑Tracker** – Erfassung gemeinsamer Ausgaben mit automatischer Aufteilung der Beträge
 	auf alle Bewohner.
 2. **Task‑Scheduler (Ämtli‑Plan)** – Zuweisung, Rotation und Statusverfolgung von Haushaltspflichten.
@@ -40,6 +45,8 @@ Browser <--> NiceGUI Server (main.py) <--> SQLAlchemy <--> SQLite DB
 Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folgen dem Format
 "Als [Rolle] möchte ich ... , damit ...". Akzeptanzkriterien sind bei Bedarf im Code/Issues dokumentiert.
 
+> **Status:** Derzeit unterstützt das System nur die Basisstory zum Anlegen von Mitbewohner*innen.
+
 **Finanzen (Shared Expenses)**
 * Als Mitbewohner*in möchte ich eine Liste aller bisherigen Ausgaben sehen, um nachzuvollziehen, wofür Geld ausgegeben wurde.
 * Als Mitbewohner*in möchte ich den Schuldenstand zu anderen Personen sehen, um den Ausgleich zu planen.
@@ -54,14 +61,26 @@ Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folge
 * Als Nutzer*in möchte ich meinen Namen und eine Kennfarbe definieren, damit meine Einträge in der UI eindeutig erkennbar sind.
 * Als WG möchte ich monatliche Statistiken (z. B. "Wer hat am meisten geputzt?") sehen.
 
-Ämtli & Organisation (Tasks)
-* *Aufgabenstatus aktualisieren: Als Mitbewohner möchte ich ein Ämtli als "erledigt" markieren können, damit die anderen sehen, dass die Aufgabe erledigt wurde.*
-* *Rotation der Aufgaben: Als WG möchte ich, dass die Ämtli wöchentlich automatisch zwischen den Bewohnern rotieren, damit die Last gerecht verteilt ist.*
-* *Priorisierung: Als Mitbewohner möchte ich Aufgaben als "dringend" markieren können (z. B. "Müll rausbringen"), um die Aufmerksamkeit des Zuständigen zu erhöhen.*
+## 8. Roadmap (geplante Erweiterungen)
 
-Administration & ProfileProfil-Personalisierung
-* *Als Nutzer möchte ich meinen Namen und eine Kennfarbe festlegen können, damit meine Beiträge in der UI (NiceGUI) klar erkennbar sind.*
-* *WG-Statistiken: Als WG möchten wir eine monatliche Zusammenfassung sehen (z. B. "Wer hat am meisten geputzt?"), um das Gemeinschaftsgefühl oder die Disziplin zu fördern.*
+1. **Shared‑Expense‑Tracker**
+	* Ausgaben eintragen, kategorisieren und filtern
+	* Automatische Aufteilung / Settlements zwischen Bewohnern
+	* Export als CSV / PDF
+
+2. **Ämtli / Task‑Scheduler**
+	* Aufgaben erstellen und wiederkehrend planen
+	* Rotationslogik (wöchentlich/monatlich)
+	* Status, Priorität, Erinnerungen
+
+3. **Benutzerprofil & Authentifizierung**
+	* Nutzerkonto mit Name, Kennfarbe, optionalem Profilbild
+	* Rollen/Administration (z. B. WG‑Admin)
+
+4. **UX / UI‑Modernisierung**
+	* Responsive Layout (Mobile + Desktop)
+	* Fokus auf Klarheit: Karten, Farben, kurze Feedback-Popups
+	* Barrierefreiheit (kontrastfreundliche Farben, Tastaturnavigation)
 
 ## 5. Verwendete Bibliotheken & Tools
 * **Python 3.11** (minimal), getestet unter 3.11/3.12
