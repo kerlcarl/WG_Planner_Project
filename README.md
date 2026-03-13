@@ -94,7 +94,7 @@ Diese Gliederung hilft beim Review-Prozess und der Evaluierung durch Dozenten.
 	```
 2. Virtuelle Umgebung erstellen und aktivieren (empfohlen):
 	```bash
-	python -m venv .venv
+	python3 -m venv .venv
 	source .venv/bin/activate
 	```
 3. Abhängigkeiten installieren:
@@ -104,7 +104,7 @@ Diese Gliederung hilft beim Review-Prozess und der Evaluierung durch Dozenten.
 4. (Optional) Umgebungsvariablen setzen, z.B. `PORT=8000` oder `DATABASE_URL=sqlite:///wgplanner.db`.
 5. Anwendung starten:
 	```bash
-	python main.py
+	python3 main.py
 	```
 6. Im Browser öffnen: `http://localhost:8080` (Standardport; konfigurierbar via `PORT`).
 

@@ -1,0 +1,5 @@
+# Minimal dependency list to run the WG Planner application.
+# Install with: pip install -r requirements.txt
+
+nicegui>=1.0.0
+SQLAlchemy>=1.4
