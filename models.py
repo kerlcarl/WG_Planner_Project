@@ -1,107 +1,94 @@
-"""Datenmodell und Datenbank-Setup für den WG Planner.
-
-Dieses Modul enthält die SQLAlchemy-Modelle und die Initialisierung
-der SQLite-Datenbank. Andere Module importieren hieraus `Session`
-und die Modellklassen.
-"""
-
 from datetime import datetime
-
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Table,
-    create_engine,
-)
+from typing import List
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, create_engine
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-
-# ------------------
-# Datenbankkonfiguration
-# ------------------
-# Standardmäßig wird eine lokale SQLite-Datei verwendet.
-DATABASE_URL = 'sqlite:///wg_planner.db'
-
-engine = create_engine(DATABASE_URL, echo=False)
+# Basis-Klasse für SQLAlchemy (Unit 6/7 Thema)
 Base = declarative_base()
 
-
-class MitbewohnerDB(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    color = Column(String, nullable=True)
-    profile_image_url = Column(String, nullable=True)
-
-    def __repr__(self) -> str:
-        return f"<User id={self.id} name={self.name}>"
-
-
-# Many-to-many link table: welche Nutzer an welcher Ausgabe beteiligt sind.
+# Many-to-Many Verknüpfungstabelle für Ausgaben (Unit 7)
+# Ermöglicht es, dass eine Ausgabe auf bestimmte Mitbewohner aufgeteilt wird
 expense_participants = Table(
     'expense_participants',
     Base.metadata,
-    Column('expense_id', ForeignKey('expenses.id'), primary_key=True),
-    Column('user_id', ForeignKey('users.id'), primary_key=True),
+    Column('expense_id', Integer, ForeignKey('expenses.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True)
 )
+
+class MitbewohnerDB(Base):
+    """
+    Repräsentiert einen WG-Bewohner.
+    Verantwortung (SRP): Speicherung von Nutzerdaten und Relationen.
+    """
+    __tablename__ = 'users'
+
+    id: int = Column(Integer, primary_key=True)
+    name: str = Column(String, nullable=False)
+    color: str = Column(String, default='#336699') # Kennfarbe (Unit 9 NiceGUI)
+    
+    # Relationships (Unit 7)
+    # Ein User hat viele Aufgaben und viele bezahlte Ausgaben
+    tasks = relationship("Task", back_populates="assigned_to")
+    expenses_paid = relationship("Expense", back_populates="paid_by")
+    
+    # Many-to-Many: Ausgaben, an denen der User beteiligt ist
+    expenses_involved = relationship("Expense", secondary=expense_participants, back_populates="participants")
+
+    def __repr__(self) -> str: # Magic Method (Unit 3, Slide 30)
+        return f"<Mitbewohner(name='{self.name}')>"
+
+
+class Task(Base):
+    """
+    Repräsentiert ein 'Ämtli'.
+    """
+    __tablename__ = 'tasks'
+
+    id: int = Column(Integer, primary_key=True)
+    title: str = Column(String, nullable=False)
+    priority: str = Column(String, default='Normal') # z.B. 'Dringend' (User Story)
+    is_done: bool = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    # Foreign Key zu Mitbewohner (Unit 7)
+    assigned_to_id = Column(Integer, ForeignKey('users.id'))
+    assigned_to = relationship("MitbewohnerDB", back_populates="tasks")
 
 
 class Expense(Base):
-    """Eine gemeinsame Ausgabe, die von einem Nutzer angelegt wurde."""
-
+    """
+    Repräsentiert eine finanzielle Ausgabe.
+    Beinhaltet Logik zur Kostenaufteilung (Encapsulation).
+    """
     __tablename__ = 'expenses'
-    id = Column(Integer, primary_key=True)
-    description = Column(String, nullable=False)
-    amount = Column(Float, nullable=False)
-    category = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    paid_by_id = Column(Integer, ForeignKey('users.id'), nullable=False)
 
-    paid_by = relationship('MitbewohnerDB', back_populates='expenses_paid')
-    participants = relationship('MitbewohnerDB', secondary=expense_participants, back_populates='expenses')
+    id: int = Column(Integer, primary_key=True)
+    description: str = Column(String, nullable=False)
+    amount: float = Column(Float, nullable=False)
+    category: str = Column(String)
+    
+    # Wer hat es bezahlt?
+    paid_by_id = Column(Integer, ForeignKey('users.id'))
+    paid_by = relationship("MitbewohnerDB", back_populates="expenses_paid")
 
-    def split_per_person(self) -> float:
-        """Berechnet den Anteil pro beteiligter Person."""
+    # Wer ist beteiligt? (Many-to-Many)
+    participants = relationship("MitbewohnerDB", secondary=expense_participants, back_populates="expenses_involved")
+
+    def calculate_share(self) -> float:
+        """
+        Berechnet den Anteil pro Person.
+        Beispiel für eine Methode, die auf dem internen State operiert (Unit 3).
+        """
         if not self.participants:
             return 0.0
         return self.amount / len(self.participants)
 
 
-class Task(Base):
-    """Ein Haushaltsposten (Ämtli) mit Zuweisung und Status."""
+# --- Datenbank Initialisierung (Unit 6) ---
+DATABASE_URL = 'sqlite:///wg_planner.db'
+engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})
+Session = sessionmaker(bind=engine)
 
-    __tablename__ = 'tasks'
-    id = Column(Integer, primary_key=True)
-    title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    assigned_to_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    priority = Column(String, nullable=True)
-    is_done = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    assigned_to = relationship('MitbewohnerDB', back_populates='tasks')
-
-    def __repr__(self) -> str:
-        return f"<Task id={self.id} title={self.title} done={self.is_done}>"
-
-
-# Erweiterungen für User-Relationen
-MitbewohnerDB.expenses_paid = relationship('Expense', back_populates='paid_by')
-MitbewohnerDB.expenses = relationship('Expense', secondary=expense_participants, back_populates='participants')
-MitbewohnerDB.tasks = relationship('Task', back_populates='assigned_to')
-
-
-def init_db() -> sessionmaker:
-    """Erstellt die Tabellen (falls nötig) und liefert eine Session-Klasse."""
-
+def init_db():
+    """Erstellt alle Tabellen basierend auf den Modellen."""
     Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)
-
-
-# Für einfache Skripte kann man mit `session = Session()` arbeiten.
-Session = init_db()
