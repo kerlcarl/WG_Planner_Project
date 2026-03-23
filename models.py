@@ -49,6 +49,7 @@ class Task(Base):
     priority: str = Column(String, default='Normal') # z.B. 'Dringend' (User Story)
     is_done: bool = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
+    due_date = Column(DateTime, nullable=True)  # Fälligkeitsdatum
 
     # Foreign Key zu Mitbewohner (Unit 7)
     assigned_to_id = Column(Integer, ForeignKey('users.id'))
@@ -66,6 +67,7 @@ class Expense(Base):
     description: str = Column(String, nullable=False)
     amount: float = Column(Float, nullable=False)
     category: str = Column(String)
+    created_at = Column(DateTime, default=datetime.now)
     
     # Wer hat es bezahlt?
     paid_by_id = Column(Integer, ForeignKey('users.id'))

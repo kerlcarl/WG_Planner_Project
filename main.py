@@ -1,356 +1,233 @@
 from nicegui import ui
-
 from models import Expense, MitbewohnerDB, Session, Task, engine, Base
+from datetime import datetime, timedelta
 
-
-# Session-Factory (SQLAlchemy) wird in models.py initialisiert.
-# Für jeden Request eine neue Session erstellen
+# --- Hilfsfunktionen ---
 def get_session():
     return Session()
 
-# Dark Mode State
-dark_mode = False
-
-# 2. Logik-Klasse (Anwendungslogik / OOP)
 def calculate_balances() -> dict[int, float]:
-    """Berechnet den Saldo (Zahlung minus Anteil) pro Nutzer."""
-
     session = get_session()
     users = session.query(MitbewohnerDB).all()
     balances = {u.id: 0.0 for u in users}
-
     for expense in session.query(Expense).all():
         share = expense.calculate_share()
         for user in expense.participants:
             balances[user.id] -= share
         balances[expense.paid_by_id] += expense.amount
-
     session.close()
     return balances
 
+# --- UI Render-Funktionen ---
 
-def rotate_tasks() -> None:
-    """Rotiert alle offenen Aufgaben zum nächsten Mitbewohner."""
+def render_users_tab(container):
+    # 1. Bereich zum Hinzufügen (fest oben)
+    with ui.card().classes('w-full mb-4 p-4 shadow-md'):
+        ui.label('Neue*n Mitbewohner*in hinzufügen').classes('text-h6 text-blue-700 font-bold')
+        name_input = ui.input('Name')
+        
+        def handle_add():
+            if name_input.value:
+                add_user(name_input, refresh_list)
+        
+        name_input.on('keydown.enter', handle_add)
+        ui.button('Hinzufügen', on_click=handle_add).classes('w-full bg-blue-600 text-white mt-2')
+    
+    # 2. Feste Überschrift für die Liste (steht immer an derselben Stelle)
+    ui.label('Aktuelle Mitbewohner*innen').classes('text-h6 mt-4 mb-2 font-bold')
+    
+    # 3. Container NUR für die dynamischen Listeneinträge
+    list_items_container = ui.column().classes('w-full')
 
-    session = get_session()
-    users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.id).all()
-    if not users:
-        session.close()
-        return
-
-    tasks = session.query(Task).filter_by(is_done=False).all()
-    for task in tasks:
-        if not task.assigned_to:
-            task.assigned_to = users[0]
-        else:
-            idx = next((i for i, u in enumerate(users) if u.id == task.assigned_to.id), 0)
-            task.assigned_to = users[(idx + 1) % len(users)]
-
-    session.commit()
-    session.close()
-
-# 3. Frontend (Präsentationsschicht mit NiceGUI)
-users_container = None
-
-def refresh_users_list():
-    """Aktualisiert die Benutzerliste dynamisch ohne Seite neu zu laden."""
-    global users_container
-    if users_container:
-        users_container.clear()
+    def refresh_list():
+        list_items_container.clear()
         session = get_session()
-        users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name)
-        card_class = 'dark:bg-gray-700 dark:border-blue-400 bg-gradient to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500' if dark_mode else 'bg-gradient to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500'
-        if users.count() == 0:
-            ui.label('Noch keine Bewohner*innen hinzugefügt.').classes('text-gray-500 italic')
-        else:
+        users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
+        with list_items_container:
+            if not users:
+                ui.label('Noch keine Mitbewohner*innen vorhanden.').classes('text-gray-500 italic p-4')
             for user in users:
-                with ui.card().classes(f'w-full {card_class} mb-2'):
-                    with ui.row().classes('w-full items-center justify-between p-3'):
-                        ui.label(f'{user.name}').classes('text-h6 font-bold')
-                        with ui.row().classes('gap-2'):
-                            ui.button('Bearbeiten', on_click=lambda u=user: edit_user(u)).classes('bg-indigo-500 text-white')
-                            ui.button('Löschen', on_click=lambda u=user: delete_user(u)).classes('bg-red-500 text-white')
+                with ui.card().classes('w-full border-l-4 border-blue-500 shadow-sm mb-2'):
+                    with ui.row().classes('w-full items-center justify-between p-2'):
+                        ui.label(user.name).classes('text-bold text-lg')
+                        with ui.row().classes('gap-1'):
+                            ui.button(icon='edit', on_click=lambda u=user: edit_user(u, refresh_list)).props('flat round')
+                            ui.button(icon='delete', on_click=lambda u=user: delete_user(u, refresh_list)).props('flat round color=red')
         session.close()
 
-def render_users_tab():
-    global users_container
-    session = get_session()
-    card_class = 'dark:bg-gray-800 dark:text-white bg-white' if dark_mode else 'bg-white'
-    label_class = 'dark:text-blue-300 text-blue-700' if dark_mode else 'text-blue-700'
-    input_class = 'dark:bg-gray-700 dark:text-white' if dark_mode else ''
-    
-    with ui.column().classes('w-full h-full overflow-auto'):
-        with ui.row().classes('w-full gap-4 p-6'):
-            # Form für neuen Mitbewohner
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Neuen Mitbewohner hinzufügen').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                name_input = ui.input(label='Name', placeholder='z. B. Anna').classes(f'w-full {input_class}')
-                def on_add_click():
-                    add_user(name_input.value)
-                    name_input.value = ''  # Leere das Input-Feld
-                ui.button('Hinzufügen', on_click=on_add_click).classes('w-full bg-blue-500 text-white font-bold py-2 rounded-lg hover:bg-blue-600')
+    # Initiales Laden der Liste
+    refresh_list()
 
-            # Liste der Bewohner
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Aktuelle Bewohner*innen').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                users_container = ui.column().classes('w-full')
-                with users_container:
-                    users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name)
-                    card_item_class = 'dark:bg-gray-700 dark:border-blue-400 bg-gradient to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500' if dark_mode else 'bg-gradient to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500'
-                    if users.count() == 0:
-                        ui.label('Noch keine Bewohner*innen hinzugefügt.').classes('text-gray-500 italic')
-                    else:
-                        for user in users:
-                            with ui.card().classes(f'w-full {card_item_class} mb-2'):
-                                with ui.row().classes('w-full items-center justify-between p-3'):
-                                    ui.label(f'{user.name}').classes('text-h6 font-bold')
-                                    with ui.row().classes('gap-2'):
-                                        ui.button('Bearbeiten', on_click=lambda u=user: edit_user(u)).classes('bg-indigo-500 text-white')
-                                        ui.button('Löschen', on_click=lambda u=user: delete_user(u)).classes('bg-red-500 text-white')
-    session.close()
+def render_finances_tab(container):
+    def refresh():
+        container.clear()
+        session = get_session()
+        balances = calculate_balances()
+        users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
+        expenses = session.query(Expense).order_by(Expense.id.desc()).all()
+        
+        with container:
+            with ui.expansion('Neue Ausgabe erfassen', icon='add_shopping_cart').classes('w-full bg-green-50 mb-4 shadow-sm'):
+                desc = ui.input('Beschreibung')
+                amt = ui.number('Betrag (CHF)', format='%.2f')
+                cat = ui.input('Kategorie')
+                u_map = {u.id: u.name for u in users}
+                payer = ui.select(u_map, label='Bezahlt von')
+                parts = ui.select(u_map, label='Beteiligte Mitbewohner*innen', multiple=True)
+                
+                def handle_save():
+                    save_expense(desc, amt, cat, payer, parts, refresh)
+                
+                desc.on('keydown.enter', handle_save)
+                ui.button('Speichern', on_click=handle_save).classes('bg-green-600 text-white w-full mt-2')
 
+            ui.label('Kontostände').classes('text-h6 font-bold mb-2')
+            for user in users:
+                bal = balances.get(user.id, 0.0)
+                color = 'text-green-700' if bal >= 0 else 'text-red-700'
+                with ui.card().classes('w-full mb-2 shadow-sm border-l-4 border-green-500'):
+                    with ui.row().classes('w-full justify-between items-center p-2'):
+                        ui.label(user.name).classes('text-bold')
+                        ui.label(f'CHF {bal:.2f}').classes(f'text-bold {color}')
 
-def add_user(name: str) -> None:
-    if not name:
-        ui.notify('Bitte einen Namen eingeben.', color='warning')
+            ui.label('Ausgabenverlauf').classes('text-h6 font-bold mt-6 mb-2')
+            for exp in expenses:
+                with ui.card().classes('w-full p-3 bg-white mb-2 shadow-sm'):
+                    with ui.row().classes('w-full justify-between items-center'):
+                        with ui.column():
+                            ui.label(exp.description).classes('text-bold')
+                            ui.label(f"Kategorie: {exp.category or 'Allgemein'}").classes('text-xs text-gray-500')
+                        with ui.column().classes('items-end'):
+                            ui.label(f"CHF {exp.amount:.2f}").classes('text-bold')
+                            ui.label(f"Bezahlt von {exp.paid_by.name if exp.paid_by else 'Unbekannt'}").classes('text-xs')
+                    ui.separator().classes('my-1')
+                    ui.label(f"Beteiligt: {', '.join([p.name for p in exp.participants])}").classes('text-xs italic')
+
+        session.close()
+    refresh()
+
+def render_tasks_tab(container):
+    def refresh():
+        container.clear()
+        session = get_session()
+        tasks = session.query(Task).all()
+        users = session.query(MitbewohnerDB).all()
+        event_days = [t.created_at.strftime('%Y-%m-%d') for t in tasks if t.created_at]
+
+        with container:
+            with ui.expansion('Neues Ämtli erstellen', icon='playlist_add').classes('w-full bg-orange-50 mb-4 shadow-sm'):
+                title = ui.input('Titel')
+                who = ui.select({u.id: u.name for u in users}, label='Zuständige*r Mitbewohner*in')
+                
+                def handle_task():
+                    save_task(title, who, refresh)
+                
+                title.on('keydown.enter', handle_task)
+                ui.button('Erstellen', on_click=handle_task).classes('bg-orange-500 text-white w-full mt-2')
+
+            ui.label('Ämtli-Kalender').classes('text-h6 font-bold mb-2')
+            ui.date().props(f'events={event_days} event-color="orange"').classes('w-full mb-4')
+
+            ui.label('Offene Aufgaben').classes('text-h6 font-bold mb-2')
+            for task in tasks:
+                status_class = 'bg-green-100 line-through text-gray-400' if task.is_done else 'bg-yellow-50'
+                with ui.card().classes(f'w-full mb-2 border-l-4 border-orange-400 {status_class} shadow-sm'):
+                    with ui.row().classes('w-full items-center p-2'):
+                        ui.checkbox(value=task.is_done, on_change=lambda e, t=task: update_task_status(t, e.value, refresh))
+                        with ui.column().classes('flex-grow'):
+                            ui.label(task.title).classes('text-bold')
+                            ui.label(f'Zuständig: {task.assigned_to.name if task.assigned_to else "Niemand"}').classes('text-xs')
+        session.close()
+    refresh()
+
+# --- CRUD-Operationen ---
+
+def add_user(input_field, callback):
+    s = get_session()
+    s.add(MitbewohnerDB(name=input_field.value.strip()))
+    s.commit(); s.close()
+    input_field.value = ''
+    ui.notify('Mitbewohner*in hinzugefügt', color='positive')
+    callback()
+
+def save_expense(desc, amt, cat, payer, parts, callback):
+    if not desc.value or not amt.value or not payer.value:
+        ui.notify('Bitte alle Pflichtfelder ausfüllen', color='warning')
         return
+    s = get_session()
+    exp = Expense(description=desc.value, amount=amt.value, category=cat.value, paid_by_id=payer.value)
+    if parts.value:
+        for p_id in parts.value:
+            u = s.get(MitbewohnerDB, p_id)
+            if u: exp.participants.append(u)
+    s.add(exp); s.commit(); s.close()
+    ui.notify('Ausgabe erfolgreich gespeichert', color='positive')
+    callback()
 
-    session = get_session()
-    new_user = MitbewohnerDB(name=name.strip())
-    session.add(new_user)
-    session.commit()
-    session.close()
-    ui.notify(f'{name} wurde hinzugefügt!')
-    refresh_users_list()
+def save_task(title, who, callback):
+    if not title.value: return
+    s = get_session()
+    s.add(Task(title=title.value, assigned_to_id=who.value))
+    s.commit(); s.close()
+    ui.notify('Neues Ämtli erstellt', color='positive')
+    callback()
 
+def update_task_status(task, val, callback):
+    s = get_session()
+    task.is_done = val
+    s.merge(task); s.commit(); s.close()
+    callback()
 
-def edit_user(user: MitbewohnerDB):
-    with ui.dialog() as dialog:
+def delete_user(user, callback):
+    s = get_session()
+    u_to_del = s.get(MitbewohnerDB, user.id)
+    if u_to_del:
+        s.delete(u_to_del)
+        s.commit()
+    s.close()
+    ui.notify('Eintrag gelöscht', color='negative')
+    callback()
+
+def edit_user(user, callback):
+    with ui.dialog() as d, ui.card():
         ui.label(f'Bearbeite {user.name}').classes('text-h6')
-        name_input = ui.input(label='Name', value=user.name)
+        name_in = ui.input(value=user.name)
         with ui.row():
-            ui.button('Speichern', on_click=lambda: save_edit(user, name_input.value, dialog))
-            ui.button('Abbrechen', on_click=dialog.close)
-    dialog.open()
+            ui.button('Speichern', on_click=lambda: (save_user_edit(user.id, name_in.value, d), callback()))
+            ui.button('Abbrechen', on_click=d.close).props('flat')
+    d.open()
 
-
-def save_edit(user: MitbewohnerDB, name: str, dialog):
-    if not name:
-        ui.notify('Name erforderlich.', color='warning')
-        return
-    session = get_session()
-    user.name = name.strip()
-    session.merge(user)
-    session.commit()
-    session.close()
-    ui.notify('Gespeichert!')
+def save_user_edit(uid, new_name, dialog):
+    s = get_session()
+    u = s.get(MitbewohnerDB, uid)
+    if u: u.name = new_name
+    s.commit(); s.close()
     dialog.close()
-    refresh_users_list()
 
-
-def delete_user(user: MitbewohnerDB):
-    session = get_session()
-    session.delete(user)
-    session.commit()
-    session.close()
-    ui.notify(f'{user.name} wurde gelöscht!')
-    refresh_users_list()
-
-
-def render_finances_tab():
-    session = get_session()
-    card_class = 'dark:bg-gray-800 dark:text-white bg-white' if dark_mode else 'bg-white'
-    label_class = 'dark:text-green-300 text-green-700' if dark_mode else 'text-green-700'
-    input_class = 'dark:bg-gray-700 dark:text-white' if dark_mode else ''
-    
-    with ui.column().classes('w-full h-full overflow-auto'):
-        with ui.row().classes('w-full gap-4 p-6'):
-            # Form für neue Ausgabe
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Neue Ausgabe erfassen').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                desc_input = ui.input(label='Beschreibung', placeholder='z. B. Lebensmittel').classes(f'w-full {input_class}')
-                amount_input = ui.number(label='Betrag (CHF)').classes(f'w-full {input_class}')
-                category_input = ui.input(label='Kategorie', placeholder='z. B. Lebensmittel').classes(f'w-full {input_class}')
-                paid_by_select = ui.select({u.name: u.id for u in session.query(MitbewohnerDB)}, label='Bezahlt von').classes(f'w-full {input_class}')
-                participants_multi = ui.select(
-                    {u.name: u.id for u in session.query(MitbewohnerDB)},
-                    label='Beteiligt',
-                    multiple=True
-                ).classes(f'w-full {input_class}')
-                ui.button('Speichern', on_click=lambda: add_expense(desc_input.value, amount_input.value, category_input.value, paid_by_select.value, participants_multi.value)).classes('w-full bg-green-500 text-white font-bold py-2 rounded-lg hover:bg-green-600')
-
-            # Saldo-Übersicht
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Saldo pro Person').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                balances = calculate_balances()
-                users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name)
-                card_item_class = 'dark:bg-gray-700 dark:border-green-400 bg-green-50 border-l-4 border-green-500' if dark_mode else 'bg-green-50 border-l-4 border-green-500'
-                if users.count() == 0:
-                    ui.label('Noch keine Mitbewohner*innen hinzugefügt.').classes('text-gray-500 italic')
-                else:
-                    # Sortiere nach Saldo (höchste zuerst)
-                    sorted_users = sorted(users, key=lambda u: balances.get(u.id, 0.0), reverse=True)
-                    for user in sorted_users:
-                        amount = balances.get(user.id, 0.0)
-                        with ui.card().classes(f'w-full {card_item_class} mb-2'):
-                            with ui.row().classes('w-full items-center justify-between p-3'):
-                                ui.label(f'{user.name}').classes('text-h6 font-bold')
-                                ui.label(f'CHF {amount:0.2f}').classes(f'text-h6 font-bold {label_class}')
-    session.close()
-
-
-def add_expense(description: str, amount: float, category: str, paid_by_id: int, participant_ids: list[int]):
-    amount_value = amount
-    if not isinstance(amount_value, (int, float)) or amount_value <= 0:
-        ui.notify('Ungültiger Betrag.', color='negative')
-        return
-
-    if not description or amount_value <= 0:
-        ui.notify('Beschreibung und Betrag sind erforderlich.', color='warning')
-        return
-
-    if not paid_by_id:
-        ui.notify('Bitte wähle aus, wer bezahlt hat.', color='warning')
-        return
-
-    if not participant_ids:
-        ui.notify('Bitte mindestens einen Teilnehmer wählen.', color='warning')
-        return
-
-    session = get_session()
-    expense = Expense(
-        description=description.strip(),
-        amount=amount_value,
-        category=category.strip() if category else None,
-        paid_by_id=paid_by_id,
-    )
-    # Teilnehmer hinzufügen
-    for uid in participant_ids:
-        user = session.get(MitbewohnerDB, uid)
-        if user:
-            expense.participants.append(user)
-
-    session.add(expense)
-    session.commit()
-    session.close()
-    ui.notify('Ausgabe gespeichert.')
-    ui.reload()
-
-
-def render_tasks_tab():
-    session = get_session()
-    card_class = 'dark:bg-gray-800 dark:text-white bg-white' if dark_mode else 'bg-white'
-    label_class = 'dark:text-orange-300 text-orange-700' if dark_mode else 'text-orange-700'
-    input_class = 'dark:bg-gray-700 dark:text-white' if dark_mode else ''
-    
-    with ui.column().classes('w-full h-full overflow-auto'):
-        with ui.row().classes('w-full gap-4 p-6'):
-            # Form für neue Aufgabe
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Neue Aufgabe erstellen').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                title_input = ui.input(label='Titel', placeholder='z. B. Putzen').classes(f'w-full {input_class}')
-                desc_input = ui.input(label='Beschreibung', placeholder='Optional').classes(f'w-full {input_class}')
-                assigned_select = ui.select({u.name: u.id for u in session.query(MitbewohnerDB)}, label='Zugewiesen an').classes(f'w-full {input_class}')
-                ui.button('Erstellen', on_click=lambda: add_task(title_input.value, desc_input.value, assigned_select.value)).classes('w-full bg-orange-500 text-white font-bold py-2 rounded-lg hover:bg-orange-600')
-
-            # Aufgaben-Liste
-            with ui.card().classes(f'flex-grow {card_class} shadow-md rounded-lg'):
-                ui.label('Aktuelle Aufgaben').classes(f'text-h6 font-bold {label_class}')
-                ui.separator().classes('my-3')
-                tasks = session.query(Task).order_by(Task.id)
-                card_item_class = 'dark:bg-gray-700 dark:border-orange-400 bg-yellow-100 border-l-4 border-orange-500' if dark_mode else 'bg-yellow-100 border-l-4 border-orange-500'
-                if tasks.count() == 0:
-                    ui.label('Noch keine Aufgaben hinzugefügt.').classes('text-gray-500 italic')
-                else:
-                    for task in tasks:
-                        status_class = 'dark:bg-green-900 bg-green-100 line-through' if task.is_done else card_item_class
-                        with ui.card().classes(f'w-full {status_class} mb-2'):
-                            with ui.row().classes('w-full items-center justify-between p-3'):
-                                ui.checkbox(value=task.is_done, on_change=lambda checked, t=task: toggle_task_done(t, checked))
-                                with ui.column().classes('flex-grow'):
-                                    ui.label(f'{task.title}').classes('text-h6 font-bold')
-                                    ui.label(f'{task.assigned_to.name if task.assigned_to else "Niemand"}').classes('text-caption text-gray-600')
-                with ui.row().classes('w-full p-3 border-t'):
-                    ui.button('Aufgaben rotieren', on_click=lambda: (rotate_tasks(), ui.reload())).classes('bg-purple-500 text-white font-bold rounded-lg hover:bg-purple-600')
-    session.close()
-
-
-def add_task(title: str, description: str, assigned_to_id: int):
-    if not title:
-        ui.notify('Titel erforderlich.', color='warning')
-        return
-
-    session = get_session()
-    task = Task(title=title.strip(), description=description.strip() if description else None)
-    if assigned_to_id:
-        user = session.get(MitbewohnerDB, assigned_to_id)
-        if user:
-            task.assigned_to = user
-
-    session.add(task)
-    session.commit()
-    session.close()
-    ui.notify('Aufgabe erstellt.')
-    ui.reload()
-
-
-def toggle_task_done(task: Task, done: bool):
-    session = get_session()
-    task.is_done = done
-    session.merge(task)
-    session.commit()
-    session.close()
-    ui.reload()
-
+# --- Hauptseite ---
 
 @ui.page('/')
 def main_page():
-    global dark_mode
+    ui.query('body').style('background-color: #f0f2f5')
     
-    # Container für die Hauptseite, damit wir sie neu zeichnen können
-    main_container = ui.column().classes('w-full h-screen')
-    
-    def toggle_dark_mode():
-        global dark_mode
-        dark_mode = not dark_mode
-        main_container.clear()
-        render_main_content(main_container)
-    
-    def render_main_content(container):
-        with container:
-            # Background basierend auf Dark Mode
-            bg_class = 'dark:bg-gray-900 dark:text-white bg-gradient to-r from-blue-50 to-indigo-50' if dark_mode else 'bg-gradient to-r from-blue-50 to-indigo-50'
-            
-            # Header
-            header_class = 'dark:bg-gray-800 bg-gradient to-r from-blue-500 to-indigo-600 text-white' if dark_mode else 'bg-gradient to-r from-blue-500 to-indigo-600 text-white'
-            with ui.row().classes(f'w-full {header_class} shadow-lg p-6 items-center'):
-                ui.label('WG Planner - Verwaltung für gemeinsames Wohnen').classes('text-h4 font-bold flex-grow')
-                ui.button('Dunkel' if not dark_mode else 'Hell', on_click=toggle_dark_mode).classes('bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800')
-            
-            # Tabs
-            with ui.row().classes('w-full'):
-                with ui.column().classes('w-full'):
-                    with ui.tabs().classes('w-full') as tabs:
-                        ui.tab('Mitbewohner*innen', icon='group')
-                        ui.tab('Finanzen', icon='attach_money')
-                        ui.tab('Aufgaben', icon='checklist')
+    with ui.header().classes('bg-indigo-700 p-4 shadow-lg'):
+        ui.label('WG-Planner').classes('text-h4 text-white font-bold')
 
-                    with ui.tab_panels(tabs, value='Mitbewohner*innen').classes('w-full'):
-                        with ui.tab_panel('Mitbewohner*innen').classes('w-full'):
-                            render_users_tab()
-                        with ui.tab_panel('Finanzen').classes('w-full'):
-                            render_finances_tab()
-                        with ui.tab_panel('Aufgaben').classes('w-full'):
-                            render_tasks_tab()
-    
-    # Initial render
-    render_main_content(main_container)
+    with ui.tabs().classes('w-full bg-white shadow-sm') as tabs:
+        t1 = ui.tab('Mitbewohner*innen', icon='people')
+        t2 = ui.tab('Finanzen', icon='payments')
+        t3 = ui.tab('Ämtli & Kalender', icon='event')
 
-# Startet die Anwendung
-# `show=False` verhindert, dass NiceGUI versucht, einen Browser zu öffnen.
-ui.run(title='WG Planner - Verwaltung für gemeinsames Wohnen', port=8080, show=False, show_welcome_message=False)
+    with ui.tab_panels(tabs, value=t1).classes('w-full max-w-2xl mx-auto bg-transparent p-4'):
+        with ui.tab_panel(t1):
+            c1 = ui.column().classes('w-full')
+            render_users_tab(c1)
+        with ui.tab_panel(t2):
+            c2 = ui.column().classes('w-full')
+            render_finances_tab(c2)
+        with ui.tab_panel(t3):
+            c3 = ui.column().classes('w-full')
+            render_tasks_tab(c3)
+
+if __name__ in {"__main__", "__mp_main__"}:
+    ui.run(title='WG-Planner', port=8081, show=False)
