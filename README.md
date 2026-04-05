@@ -1,141 +1,69 @@
-# WG‑Planner Project
-# WG‑Planner: Finances & Task Management
+# WG-Planner
 
-## 1. Projektbeschreibung
-Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasierte Anwendung zur koordinativen Unterstützung
-von Wohngemeinschaften (WG). Entwickelt im Rahmen des Moduls "Objektorientierte Programmierung" (26FS) an der FHNW,
-zielte das Projekt darauf ab, wiederkehrende Aufgaben und gemeinsame Ausgaben strukturiert zu verwalten.
+Browserbasierte Anwendung zur Verwaltung einer Wohngemeinschaft. Der aktuelle Stand deckt Mitbewohner*innen, gemeinsame Ausgaben sowie Aufgaben mit Kalenderansicht ab.
 
-Aktuell ist die Anwendung als MVP (Minimum Viable Product) am Start und bietet eine einfache
-Oberfläche zum Hinzufügen und Anzeigen von Mitbewohner*innen. Die geplanten Kernfunktionen
-umfassen später ein Shared‑Expense‑Tracking, einen rotierenden Ämtli‑Plan und ein Benutzerprofil‑System.
+## Projektstruktur
 
-## 2. Ziele & Kernfunktionen
-Die Anwendung reduziert den administrativen Aufwand im Haushalt und erhöht die Transparenz.
-
-### ✔ Aktuell implementiert
-* **Mitbewohner‑Liste** – Hinzufügen von Personen und Anzeige aller bisher eingetragenen Mitbewohner*innen.
-
-### 🚧 Geplante Kernfunktionen
-1. **Shared‑Expense‑Tracker** – Erfassung gemeinsamer Ausgaben mit automatischer Aufteilung der Beträge
-	auf alle Bewohner.
-2. **Task‑Scheduler (Ämtli‑Plan)** – Zuweisung, Rotation und Statusverfolgung von Haushaltspflichten.
-3. **Benutzer­management** – Accounts mit Namen, Kennfarbe und optionalem Profilbild.
-4. **Responsive Web‑Frontend** – Bedienung im Browser; gestaltet mit NiceGUI.
-
-## 3. Technische Architektur
-Die Lösung ist als klassische Drei‑Schichten‑Architektur implementiert:
-
-* **Presentation Layer (Frontend)** – NiceGUI‑basierte Single‑Page‑Application, dient als Thin Client. Kommuniziert
-	per HTTP/WS mit dem Backend.
-* **Application Layer (Backend)** – Python‑Module enthalten die OOP‑Modelle (`User`, `Expense`, `Task` etc.) sowie
-	Service‑Klassen für Geschäftslogik und Routing (FastAPI/NiceGUI intern). Alle Endpunkte befinden sich
-	in `main.py` bzw. im Modul `api/`.
-* **Persistence Layer** – SQLite‑Datei (`wgplanner.db`) als lokale Datenbank; SQLAlchemy (Version 1.4.x) wird als ORM
-	genutzt. Modelle stehen in `models.py`.
-
-Ein einfaches Sequenzdiagramm:
-
+```text
+WG_Planner_Project/
+  main.py
+  models.py
+  services.py
+  ui/
+    __init__.py
+    users.py
+    finances.py
+    tasks.py
 ```
-Browser <--> NiceGUI Server (main.py) <--> SQLAlchemy <--> SQLite DB
+
+- `main.py`: Einstiegspunkt, Startlogik und Aufbau der Hauptseite
+- `models.py`: SQLAlchemy-Modelle, Session und Datenbankinitialisierung
+- `services.py`: Gemeinsame Business-Logik und CRUD-Funktionen
+- `ui/users.py`: Darstellung des Mitbewohner*innen-Tabs
+- `ui/finances.py`: Darstellung des Finanzen-Tabs
+- `ui/tasks.py`: Darstellung des Ämtli- und Kalender-Tabs
+
+## Architektur
+
+Die Anwendung ist grob in drei Verantwortungsbereiche getrennt:
+
+- Presentation Layer: NiceGUI-Komponenten in `main.py` und `ui/`
+- Application Layer: Aktionen und Geschäftslogik in `services.py`
+- Persistence Layer: SQLAlchemy-Modelle und SQLite in `models.py`
+
+Datenfluss:
+
+```text
+Browser <-> NiceGUI Server (main.py / ui) <-> services.py <-> SQLAlchemy <-> SQLite
 ```
-### UML-Klassendiagramm
-Das Design nutzt Vererbung (via SQLAlchemy Base) und Assoziationen zwischen den Domänenobjekten:
-- `MitbewohnerDB`: Zentrales Objekt für Nutzer*innendaten.
-- `Expense`: Enthält die Logik `calculate_share()` zur Kostenberechnung.
-- `Task`: Verwaltet Aufgaben und deren Zuweisung.
 
-## 4. Qualitätssicherung (Testfälle)
-Um die Zuverlässigkeit der Anwendung zu garantieren, wurden folgende Testfälle definiert:
-1. **TC-01:** Erfolgreiches Hinzufügen einer neuen Person via Tastatur (Enter).
-2. **TC-02:** Korrekte Aufteilung eines Rechnungsbetrags auf drei Personen im Finanz-Modul.
-3. **TC-03:** Persistenz-Check: Bleiben markierte Ämtli auch nach einem Neustart des Servers als "erledigt" gespeichert?
+## Aktuell implementiert
 
+- Mitbewohner*innen anlegen, bearbeiten und löschen
+- Ausgaben erfassen und Kontostände berechnen
+- Aufgaben erstellen, anzeigen und als erledigt markieren
 
-## 5. User Stories
-Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folgen dem Format
-"Als [Rolle] möchte ich ... , damit ...". Akzeptanzkriterien sind bei Bedarf im Code/Issues dokumentiert.
+## Geplante Erweiterungen
 
-> **Status:** Derzeit unterstützt das System nur die Basisstory zum Anlegen von Mitbewohner*innen.
+- Rotationslogik für Ämtli
+- Benutzerprofile mit zusätzlichen Einstellungen
+- Filter, Auswertungen und Exporte für Finanzen
+- Verbesserte mobile Darstellung und UX
 
-**Finanzen (Shared Expenses)**
-* Als Mitbewohner*in möchte ich eine Liste aller bisherigen Ausgaben sehen, um nachzuvollziehen, wofür Geld ausgegeben wurde.
-* Als Mitbewohner*in möchte ich den Schuldenstand zu anderen Personen sehen, um den Ausgleich zu planen.
-* Als Nutzer*in möchte ich Ausgaben Kategorien (Lebensmittel, Miete, Putzmittel etc.) zuordnen können, um Kostenstellen zu analysieren.
+## Installation
 
-**Ämtli & Organisation**
-* Als Mitbewohner*in möchte ich ein Ämtli als "erledigt" markieren können, damit andere den aktuellen Status sehen.
-* Die Aufgabenzuordnung soll sich wöchentlich rotieren, um die Last gerecht zu verteilen.
-* Als Mitbewohner*in möchte ich Aufgaben als "dringend" markieren können.
+1. Repository klonen
+2. Virtuelle Umgebung erstellen
+3. Abhängigkeiten installieren
+4. Anwendung starten
 
-**Administration & Profil**
-* Als Nutzer*in möchte ich meinen Namen und eine Kennfarbe definieren, damit meine Einträge in der UI eindeutig erkennbar sind.
-* Als WG möchte ich monatliche Statistiken (z. B. "Wer hat am meisten geputzt?") sehen.
+```bash
+git clone https://github.com/kerlcarl/WG_Planner_Project.git
+cd WG_Planner_Project
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
 
-## 6. Roadmap (geplante Erweiterungen)
-
-1. **Shared‑Expense‑Tracker**
-	* Ausgaben eintragen, kategorisieren und filtern
-	* Automatische Aufteilung / Settlements zwischen Bewohnern
-	* Export als CSV / PDF
-
-2. **Ämtli / Task‑Scheduler**
-	* Aufgaben erstellen und wiederkehrend planen
-	* Rotationslogik (wöchentlich/monatlich)
-	* Status, Priorität, Erinnerungen
-
-3. **Benutzerprofil & Authentifizierung**
-	* Nutzerkonto mit Name, Kennfarbe, optionalem Profilbild
-	* Rollen/Administration (z. B. WG‑Admin)
-
-4. **UX / UI‑Modernisierung**
-	* Responsive Layout (Mobile + Desktop)
-	* Fokus auf Klarheit: Karten, Farben, kurze Feedback-Popups
-	* Barrierefreiheit (kontrastfreundliche Farben, Tastaturnavigation)
-
-## 7. Verwendete Bibliotheken & Tools
-* **Python 3.11** (minimal), getestet unter 3.11/3.12
-* **NiceGUI** 1.0.x – Frontend-Framework
-* **SQLAlchemy** 1.4.x – ORM
-* **Pydantic** 2.x – Validierung
-* **FastAPI** (als HTTP Server, via NiceGUI)
-* **pytest** – Testframework (falls vorhanden)
-* **black**, **flake8** – Formatierung & Linting
-* **SQLite** – eingebettete DB
-* **Visual Studio Code** – empfohlene IDE
-
-Versionen werden in `requirements.txt` festgehalten.
-
-## 8. Arbeitsaufteilung (Initiales Konzept)
-Die Teamorganisation erfolgte über GitHub Issues/Projektboard; jeder Beitrag ist durch Commits und PRs
-nachvollziehbar. Beispielhafte Rollenverteilung:
-
-* **Backend / Datenmodell** – Klassen, Datenbankmigration, ORM-Integration
-* **Frontend / UI** – NiceGUI-Layouts, Event-Handler, Client-seitige Logik
-* **Business-Logik** – Berechnungsalgorithmen (Finanzausgleich), Turnus-Mechanismus für Aufgaben
-
-Diese Gliederung hilft beim Review-Prozess und der Evaluierung durch Dozenten.
-
-## 9. Installation & Ausführung
-1. Repository klonen:
-	```bash
-	git clone https://github.com/kerlcarl/WG_Planner_Project.git
-	cd WG_Planner_Project
-	```
-2. Virtuelle Umgebung erstellen und aktivieren (empfohlen):
-	```bash
-	python3 -m venv .venv
-	source .venv/bin/activate
-	```
-3. Abhängigkeiten installieren:
-	```bash
-	pip install -r requirements.txt
-	```
-4. (Optional) Umgebungsvariablen setzen, z.B. `PORT=8000` oder `DATABASE_URL=sqlite:///wgplanner.db`.
-5. Anwendung starten:
-	```bash
-	python3 main.py
-	```
-6. Im Browser öffnen: `http://localhost:8080` (Standardport; konfigurierbar via `PORT`).
-
-Weitere Hinweise siehe Kommentarzeilen in `main.py`.
+Die Anwendung läuft aktuell auf Port `8081`.

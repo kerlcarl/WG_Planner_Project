@@ -1,3 +1,4 @@
+# Datenmodelle und SQLAlchemy-Konfiguration fuer den WG-Planner.
 from datetime import datetime
 from typing import List
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, create_engine
