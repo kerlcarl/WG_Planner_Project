@@ -23,6 +23,49 @@ def calculate_balances() -> dict[int, float]:
     return balances
 
 
+def calculate_settlements() -> list[dict[str, float | int]]:
+    balances = calculate_balances()
+    settlements: list[dict[str, float | int]] = []
+
+    creditors = [
+        {"user_id": user_id, "amount": round(amount, 2)}
+        for user_id, amount in balances.items()
+        if amount > 0.01
+    ]
+    debtors = [
+        {"user_id": user_id, "amount": round(-amount, 2)}
+        for user_id, amount in balances.items()
+        if amount < -0.01
+    ]
+
+    creditor_index = 0
+    debtor_index = 0
+
+    while creditor_index < len(creditors) and debtor_index < len(debtors):
+        creditor = creditors[creditor_index]
+        debtor = debtors[debtor_index]
+        transfer_amount = round(min(creditor["amount"], debtor["amount"]), 2)
+
+        if transfer_amount > 0.01:
+            settlements.append(
+                {
+                    "from_user_id": debtor["user_id"],
+                    "to_user_id": creditor["user_id"],
+                    "amount": transfer_amount,
+                }
+            )
+
+        creditor["amount"] = round(creditor["amount"] - transfer_amount, 2)
+        debtor["amount"] = round(debtor["amount"] - transfer_amount, 2)
+
+        if creditor["amount"] <= 0.01:
+            creditor_index += 1
+        if debtor["amount"] <= 0.01:
+            debtor_index += 1
+
+    return settlements
+
+
 def add_user(input_field, callback):
     session = get_session()
     session.add(MitbewohnerDB(name=input_field.value.strip()))
