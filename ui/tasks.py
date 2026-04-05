@@ -49,3 +49,4 @@ def render_tasks_tab(container):
         session.close()
 
     refresh()
+    return refresh

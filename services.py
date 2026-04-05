@@ -3,6 +3,17 @@ from nicegui import ui
 
 from models import Expense, MitbewohnerDB, Session, Task
 
+DEFAULT_EXPENSE_CATEGORIES = [
+    "Lebensmittel",
+    "Haushalt",
+    "Miete",
+    "Internet",
+    "Strom",
+    "Putzmittel",
+    "Freizeit",
+    "Sonstiges",
+]
+
 
 def get_session():
     return Session()
@@ -66,6 +77,22 @@ def calculate_settlements() -> list[dict[str, float | int]]:
     return settlements
 
 
+def calculate_category_totals() -> list[dict[str, float]]:
+    session = get_session()
+    totals: dict[str, float] = {}
+
+    for expense in session.query(Expense).all():
+        category = expense.category or "Sonstiges"
+        totals[category] = totals.get(category, 0.0) + expense.amount
+
+    session.close()
+
+    return [
+        {"category": category, "amount": round(amount, 2)}
+        for category, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+
 def add_user(input_field, callback):
     session = get_session()
     session.add(MitbewohnerDB(name=input_field.value.strip()))
@@ -77,7 +104,7 @@ def add_user(input_field, callback):
 
 
 def save_expense(desc, amt, cat, payer, parts, callback):
-    if not desc.value or not amt.value or not payer.value:
+    if not desc.value or not amt.value or not payer.value or not cat.value:
         ui.notify("Bitte alle Pflichtfelder ausfuellen", color="warning")
         return
 
@@ -99,6 +126,17 @@ def save_expense(desc, amt, cat, payer, parts, callback):
     session.commit()
     session.close()
     ui.notify("Ausgabe erfolgreich gespeichert", color="positive")
+    callback()
+
+
+def delete_expense(expense, callback):
+    session = get_session()
+    expense_to_delete = session.get(Expense, expense.id)
+    if expense_to_delete:
+        session.delete(expense_to_delete)
+        session.commit()
+    session.close()
+    ui.notify("Ausgabe geloescht", color="negative")
     callback()
 
 

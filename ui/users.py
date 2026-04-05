@@ -5,7 +5,12 @@ from models import MitbewohnerDB
 from services import add_user, delete_user, edit_user, get_session
 
 
-def render_users_tab(container):
+def render_users_tab(container, on_users_changed=None):
+    def handle_users_changed():
+        refresh_list()
+        if on_users_changed:
+            on_users_changed()
+
     with container:
         with ui.card().classes("w-full mb-4 p-4 shadow-md"):
             ui.label("Neue*n Mitbewohner*in hinzufuegen").classes("text-h6 text-blue-700 font-bold")
@@ -13,7 +18,7 @@ def render_users_tab(container):
 
             def handle_add():
                 if name_input.value:
-                    add_user(name_input, refresh_list)
+                    add_user(name_input, handle_users_changed)
 
             name_input.on("keydown.enter", handle_add)
             ui.button("Hinzufuegen", on_click=handle_add).classes("w-full bg-blue-600 text-white mt-2")
@@ -36,11 +41,11 @@ def render_users_tab(container):
                         with ui.row().classes("gap-1"):
                             ui.button(
                                 icon="edit",
-                                on_click=lambda current_user=user: edit_user(current_user, refresh_list),
+                                on_click=lambda current_user=user: edit_user(current_user, handle_users_changed),
                             ).props("flat round")
                             ui.button(
                                 icon="delete",
-                                on_click=lambda current_user=user: delete_user(current_user, refresh_list),
+                                on_click=lambda current_user=user: delete_user(current_user, handle_users_changed),
                             ).props("flat round color=red")
 
         session.close()
