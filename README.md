@@ -11,10 +11,13 @@ Oberfläche zum Hinzufügen und Anzeigen von Mitbewohner*innen. Die geplanten Ke
 umfassen später ein Shared‑Expense‑Tracking, einen rotierenden Ämtli‑Plan und ein Benutzerprofil‑System.
 
 ## 2. Ziele & Kernfunktionen
-Die Anwendung reduziert den administrativen Aufwand im Haushalt und erhöht die Transparenz.
+Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen. Aktuell
+ist ein einfacher Mitbewohner‑Verwaltungsbildschirm implementiert; die folgenden Kernfunktionen sind geplant:
 
 ### ✔ Aktuell implementiert
-* **Mitbewohner‑Liste** – Hinzufügen von Personen und Anzeige aller bisher eingetragenen Mitbewohner*innen.
+* **Mitbewohner-Verwaltung** – Hinzufügen und Anzeige von Bewohnern
+* **Task-System (Ämtli)** – Aufgaben erstellen, zuweisen und als erledigt markieren
+* **Finanz-Tracker (Basis)** – Ausgaben erfassen, Teilnehmer auswählen und Kosten automatisch aufteilen
 
 ### 🚧 Geplante Kernfunktionen
 1. **Shared‑Expense‑Tracker** – Erfassung gemeinsamer Ausgaben mit automatischer Aufteilung der Beträge
@@ -39,20 +42,8 @@ Ein einfaches Sequenzdiagramm:
 ```
 Browser <--> NiceGUI Server (main.py) <--> SQLAlchemy <--> SQLite DB
 ```
-### UML-Klassendiagramm
-Das Design nutzt Vererbung (via SQLAlchemy Base) und Assoziationen zwischen den Domänenobjekten:
-- `MitbewohnerDB`: Zentrales Objekt für Nutzer*innendaten.
-- `Expense`: Enthält die Logik `calculate_share()` zur Kostenberechnung.
-- `Task`: Verwaltet Aufgaben und deren Zuweisung.
 
-## 4. Qualitätssicherung (Testfälle)
-Um die Zuverlässigkeit der Anwendung zu garantieren, wurden folgende Testfälle definiert:
-1. **TC-01:** Erfolgreiches Hinzufügen einer neuen Person via Tastatur (Enter).
-2. **TC-02:** Korrekte Aufteilung eines Rechnungsbetrags auf drei Personen im Finanz-Modul.
-3. **TC-03:** Persistenz-Check: Bleiben markierte Ämtli auch nach einem Neustart des Servers als "erledigt" gespeichert?
-
-
-## 5. User Stories
+## 4. User Stories
 Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folgen dem Format
 "Als [Rolle] möchte ich ... , damit ...". Akzeptanzkriterien sind bei Bedarf im Code/Issues dokumentiert.
 
@@ -72,7 +63,7 @@ Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folge
 * Als Nutzer*in möchte ich meinen Namen und eine Kennfarbe definieren, damit meine Einträge in der UI eindeutig erkennbar sind.
 * Als WG möchte ich monatliche Statistiken (z. B. "Wer hat am meisten geputzt?") sehen.
 
-## 6. Roadmap (geplante Erweiterungen)
+## 8. Roadmap (geplante Erweiterungen)
 
 1. **Shared‑Expense‑Tracker**
 	* Ausgaben eintragen, kategorisieren und filtern
@@ -93,7 +84,7 @@ Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folge
 	* Fokus auf Klarheit: Karten, Farben, kurze Feedback-Popups
 	* Barrierefreiheit (kontrastfreundliche Farben, Tastaturnavigation)
 
-## 7. Verwendete Bibliotheken & Tools
+## 5. Verwendete Bibliotheken & Tools
 * **Python 3.11** (minimal), getestet unter 3.11/3.12
 * **NiceGUI** 1.0.x – Frontend-Framework
 * **SQLAlchemy** 1.4.x – ORM
@@ -106,7 +97,7 @@ Die Anforderungen wurden in Form von User Stories formuliert. Alle Stories folge
 
 Versionen werden in `requirements.txt` festgehalten.
 
-## 8. Arbeitsaufteilung (Initiales Konzept)
+## 6. Arbeitsaufteilung (Initiales Konzept)
 Die Teamorganisation erfolgte über GitHub Issues/Projektboard; jeder Beitrag ist durch Commits und PRs
 nachvollziehbar. Beispielhafte Rollenverteilung:
 
@@ -116,7 +107,7 @@ nachvollziehbar. Beispielhafte Rollenverteilung:
 
 Diese Gliederung hilft beim Review-Prozess und der Evaluierung durch Dozenten.
 
-## 9. Installation & Ausführung
+## 7. Installation & Ausführung
 1. Repository klonen:
 	```bash
 	git clone https://github.com/kerlcarl/WG_Planner_Project.git

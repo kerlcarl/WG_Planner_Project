@@ -150,34 +150,34 @@ def render_content() -> None:
             with ui.card().classes('q-pa-md shadow-lg'):
                 ui.label('Neue Ausgabe').classes('text-h6')
 
-        beschreibung_in = ui.input('Beschreibung')
-        betrag_in = ui.number('Betrag', value=0)
+                beschreibung_in = ui.input('Beschreibung')
+                betrag_in = ui.number('Betrag', value=0)
 
-        users = manager.get_all_users()
-        user_options = {str(u.id): u.name for u in users}
+                users = manager.get_all_users()
+                user_options = {str(u.id): u.name for u in users}
 
-        bezahlt_von = ui.select(user_options, label='Bezahlt von')
-        teilnehmer = ui.select(user_options, label='Teilnehmer', multiple=True)
+                bezahlt_von = ui.select(user_options, label='Bezahlt von')
+                teilnehmer = ui.select(user_options, label='Teilnehmer', multiple=True)
 
-        ui.button('Speichern', on_click=lambda: manager.ausgabe_hinzufuegen(
-            beschreibung_in.value,
-            betrag_in.value,
-            int(bezahlt_von.value) if bezahlt_von.value else None,
-            [int(t) for t in teilnehmer.value] if teilnehmer.value else []
-        )).classes('w-full q-mt-sm')
+                ui.button('Speichern', on_click=lambda: manager.ausgabe_hinzufuegen(
+                    beschreibung_in.value,
+                    betrag_in.value,
+                    int(bezahlt_von.value) if bezahlt_von.value else None,
+                    [int(t) for t in teilnehmer.value] if teilnehmer.value else []
+                )).classes('w-full q-mt-sm')
 
-    ui.label('Ausgabenliste').classes('text-h5 q-mt-lg')
+            ui.label('Ausgabenliste').classes('text-h5 q-mt-lg')
 
-    for e in manager.get_all_expenses():
-        with ui.card().classes('w-full q-mb-sm'):
-            ui.label(f"{e.description} - {e.amount:.2f} CHF")
-            ui.label(f"Bezahlt von: {e.paid_by.name if e.paid_by else 'Unbekannt'}")
+            for e in manager.get_all_expenses():
+                with ui.card().classes('w-full q-mb-sm'):
+                    ui.label(f"{e.description} - {e.amount:.2f} CHF")
+                    ui.label(f"Bezahlt von: {e.paid_by.name if e.paid_by else 'Unbekannt'}")
 
-            anteil = e.calculate_share()
-            ui.label(f"Pro Person: {anteil:.2f} CHF")
+                    anteil = e.calculate_share()
+                    ui.label(f"Pro Person: {anteil:.2f} CHF")
 
-            teilnehmer_namen = ', '.join([p.name for p in e.participants])
-            ui.label(f"Teilnehmer: {teilnehmer_namen}")
+                    teilnehmer_namen = ', '.join([p.name for p in e.participants])
+                    ui.label(f"Teilnehmer: {teilnehmer_namen}")
 
 @ui.page('/')
 def main_page() -> None:
