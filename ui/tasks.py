@@ -5,12 +5,15 @@ from models import MitbewohnerDB, Task
 from services import get_session, save_task, update_task_status
 
 
+# Rendert den Aufgaben-Tab und liefert eine Refresh-Funktion zurueck.
 def render_tasks_tab(container):
+    # Baut den kompletten Tab aus aktuellen DB-Daten neu auf.
     def refresh():
         container.clear()
         session = get_session()
         tasks = session.query(Task).all()
         users = session.query(MitbewohnerDB).all()
+        # Datumswerte fuer die Kalender-Markierungen.
         event_days = [task.created_at.strftime("%Y-%m-%d") for task in tasks if task.created_at]
 
         with container:
@@ -31,6 +34,7 @@ def render_tasks_tab(container):
 
             ui.label("Offene Aufgaben").classes("text-h6 font-bold mb-2")
             for task in tasks:
+                # Visuelle Hervorhebung je nach Erledigt-Status.
                 status_class = "bg-green-100 line-through text-gray-400" if task.is_done else "bg-yellow-50"
                 with ui.card().classes(f"w-full mb-2 border-l-4 border-orange-400 {status_class} shadow-sm"):
                     with ui.row().classes("w-full items-center p-2"):

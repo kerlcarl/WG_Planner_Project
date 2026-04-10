@@ -5,13 +5,16 @@ from models import MitbewohnerDB
 from services import add_user, delete_user, edit_user, get_session
 
 
+# Rendert den Benutzer-Tab inklusive Formular und Liste.
 def render_users_tab(container, on_users_changed=None):
+    # Zentraler Refresh-Hook, damit auch andere Tabs aktualisiert werden koennen.
     def handle_users_changed():
         refresh_list()
         if on_users_changed:
             on_users_changed()
 
     with container:
+        # Eingabebereich fuer neue Mitbewohner.
         with ui.card().classes("w-full mb-4 p-4 shadow-md"):
             ui.label("Neue*n Mitbewohner*in hinzufuegen").classes("text-h6 text-blue-700 font-bold")
             name_input = ui.input("Name")
@@ -23,9 +26,11 @@ def render_users_tab(container, on_users_changed=None):
             name_input.on("keydown.enter", handle_add)
             ui.button("Hinzufuegen", on_click=handle_add).classes("w-full bg-blue-600 text-white mt-2")
 
+        # Container fuer die dynamisch neu aufgebaute Benutzerliste.
         ui.label("Aktuelle Mitbewohner*innen").classes("text-h6 mt-4 mb-2 font-bold")
         list_items_container = ui.column().classes("w-full")
 
+    # Liest Benutzer aus der DB und rendert Karten inkl. Edit/Delete.
     def refresh_list():
         list_items_container.clear()
         session = get_session()

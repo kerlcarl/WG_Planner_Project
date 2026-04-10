@@ -13,10 +13,13 @@ from services import (
 )
 
 
+# Rendert den Finanz-Tab und liefert eine Refresh-Funktion fuer Neuaufbau.
 def render_finances_tab(container):
+    # Liest aktuelle Daten, berechnet Kennzahlen und baut alle UI-Karten neu.
     def refresh():
         container.clear()
         session = get_session()
+        # Abgeleitete Werte werden zur Laufzeit berechnet (nicht separat gespeichert).
         balances = calculate_balances()
         category_totals = calculate_category_totals()
         settlements = calculate_settlements()
@@ -25,6 +28,7 @@ def render_finances_tab(container):
         user_names = {user.id: user.name for user in users}
 
         with container:
+            # Kopfkarte mit Einstieg in die Erfassung.
             with ui.card().classes("w-full mb-4 shadow-md rounded-xl bg-white"):
                 with ui.row().classes("w-full items-center justify-between gap-4 p-5"):
                     with ui.column().classes("gap-0"):
@@ -46,6 +50,7 @@ def render_finances_tab(container):
                     ui.button(icon="close", on_click=expense_dialog.close).props("flat round")
 
                 with ui.column().classes("w-full gap-4 px-5 pb-5 pt-3"):
+                    # Formfelder fuer neue Ausgabe.
                     desc = ui.input("Beschreibung").classes("w-full")
                     with ui.row().classes("w-full gap-4"):
                         amt = ui.number("Betrag (CHF)", format="%.2f").classes("w-full")
@@ -77,6 +82,7 @@ def render_finances_tab(container):
 
                         @property
                         def value(self):
+                            # Sammelt alle aktiv angehakten Teilnehmer-IDs.
                             return [user_id for user_id, checkbox in self._checkboxes.items() if checkbox.value]
 
                     parts = _PartsGroup(selected_parts_checkboxes)
@@ -84,6 +90,7 @@ def render_finances_tab(container):
                     class _CategoryField:
                         @property
                         def value(self):
+                            # Nutzt freie Eingabe nur bei "Andere...".
                             if cat_select.value == "Andere...":
                                 return custom_category.value.strip()
                             return cat_select.value
@@ -95,6 +102,7 @@ def render_finances_tab(container):
                             expense_dialog.close()
                             refresh()
 
+                        # Persistiert die Ausgabe in services.py und aktualisiert danach den Tab.
                         save_expense(desc, amt, category_field, payer, parts, refresh_and_close)
 
                     desc.on("keydown.enter", handle_save)
@@ -113,6 +121,7 @@ def render_finances_tab(container):
 
                     with ui.column().classes("w-full gap-2 p-4 pt-3"):
                         for user in users:
+                            # Anzeige des aktuellen Saldos je Person.
                             balance = balances.get(user.id, 0.0)
                             is_positive = balance >= 0
                             color = "text-green-700" if is_positive else "text-red-700"
@@ -156,6 +165,7 @@ def render_finances_tab(container):
 
                     with ui.column().classes("w-full gap-2 p-4 pt-3"):
                         if category_totals:
+                            # Balkenlaenge relativ zur groessten Kategorie.
                             highest_total = category_totals[0]["amount"]
                             for item in category_totals:
                                 width_percent = 100 if highest_total <= 0 else max(
@@ -186,6 +196,7 @@ def render_finances_tab(container):
                 if settlements:
                     with ui.column().classes("w-full gap-3 p-4 pt-3"):
                         for settlement in settlements:
+                            # Konkreter Ausgleichsvorschlag von Schuldner zu Glaeubiger.
                             from_name = user_names.get(settlement["from_user_id"], "Unbekannt")
                             to_name = user_names.get(settlement["to_user_id"], "Unbekannt")
                             with ui.card().classes("w-full bg-white border border-indigo-100 shadow-sm rounded-lg"):
@@ -220,6 +231,7 @@ def render_finances_tab(container):
 
                 with ui.column().classes("w-full gap-2 p-4 pt-3"):
                     for expense in expenses:
+                        # Historische Einzelbuchungen mit Loeschoption.
                         with ui.card().classes("w-full border border-gray-100 shadow-sm rounded-lg"):
                             with ui.row().classes("w-full justify-between items-center p-3"):
                                 with ui.column():
