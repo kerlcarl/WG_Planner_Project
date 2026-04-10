@@ -40,16 +40,16 @@ Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Tr
 ### Noch nicht implementiert
 In zukünftigen Entwicklungszyklen soll der Funktionsumfang um folgende Module erweitert werden, um die Anwendung zu einer ganzheitlichen WG-Management-Lösung auszubauen
 
-* **Finanz-Reporting & Settlement-Modul** *
+* **Finanz-Reporting & Settlement-Modul**:
   - Monatliche Konsolidierung der Finanzen inklusive automatisierter Generierung von Ausgleichszahlungsvorschlägen und Integration von              Zahlungsreferenzen (z. B. IBAN).
   -
-* **Integriertes Event- & Terminmanagement** *
+* **Integriertes Event- & Terminmanagement**:
   - Erweiterung des Kalenders um soziale Komponenten (z. B. Geburtstage, WG-Events) sowie eine direkte Aufgabenplanung aus der Kalenderansicht      heraus.
 
-* **Kollaborations-Hub (WG-Blog & Kommunikation)** *
+* **Kollaborations-Hub (WG-Blog & Kommunikation)**:
   - Implementierung eines Informations-Feeds für den asynchronen Austausch von Nachrichten sowie ein Modul für das Echtzeit-Management von          Einkaufslisten.
 
-* **Digitales Dokumentenarchiv** *
+* **Digitales Dokumentenarchiv**:
   - Zentrales Repository zur revisionssicheren Ablage und Verwaltung relevanter WG-Dokumente (z. B. Mietverträge, Nebenkostenabrechnungen).
   
 ## 3. Technische Architektur
