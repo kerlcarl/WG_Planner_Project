@@ -25,6 +25,7 @@ Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Tr
   - Detaillierter Ausgabenverlauf und Löschfunktion
   - Kategorisierung (Lebensmittel, Haushalt, Miete, Internet, Strom, Putzmittel, Freizeit, Sonstiges) + Custom-Kategorien
 
+
 * **Ämtli-Plan & Kalender** – Verwaltung von Haushaltsaufgaben mit:
   - Erstellung und Zuweisung zu Mitbewohner*innen
   - Checkbox-Status für Completion-Tracking
@@ -35,6 +36,21 @@ Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Tr
   - Flüssige Bedienung ohne Seiten-Reloads (realisiert mit NiceGUI)
   - Drei-Tab-Navigation: Mitbewohner*innen | Finanzen | Ämtli & Kalender
   - Real-time UI-Updates bei Datenänderungen
+ 
+### Noch nicht implementiert
+In zukünftigen Entwicklungszyklen soll der Funktionsumfang um folgende Module erweitert werden, um die Anwendung zu einer ganzheitlichen WG-Management-Lösung auszubauen
+
+* **Finanz-Reporting & Settlement-Modul** *
+  - Monatliche Konsolidierung der Finanzen inklusive automatisierter Generierung von Ausgleichszahlungsvorschlägen und Integration von              Zahlungsreferenzen (z. B. IBAN).
+  -
+* **Integriertes Event- & Terminmanagement** *
+  - Erweiterung des Kalenders um soziale Komponenten (z. B. Geburtstage, WG-Events) sowie eine direkte Aufgabenplanung aus der Kalenderansicht      heraus.
+
+* **Kollaborations-Hub (WG-Blog & Kommunikation)** *
+  - Implementierung eines Informations-Feeds für den asynchronen Austausch von Nachrichten sowie ein Modul für das Echtzeit-Management von          Einkaufslisten.
+
+* **Digitales Dokumentenarchiv** *
+  - Zentrales Repository zur revisionssicheren Ablage und Verwaltung relevanter WG-Dokumente (z. B. Mietverträge, Nebenkostenabrechnungen).
   
 ## 3. Technische Architektur
 Die Lösung ist als klassische Drei‑Schichten‑Architektur implementiert:
