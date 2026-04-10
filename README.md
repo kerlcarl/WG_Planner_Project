@@ -11,21 +11,31 @@ Oberfläche zum Hinzufügen und Anzeigen von Mitbewohner*innen. Die geplanten Ke
 umfassen später ein Shared‑Expense‑Tracking, einen rotierenden Ämtli‑Plan und ein Benutzerprofil‑System.
 
 ## 2. Ziele & Kernfunktionen
-Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen. Aktuell
-ist ein einfacher Mitbewohner‑Verwaltungsbildschirm implementiert; die folgenden Kernfunktionen sind geplant:
 
-### ✔ Aktuell implementiert
-* **Mitbewohner-Verwaltung** – Hinzufügen und Anzeige von Bewohnern
-* **Task-System (Ämtli)** – Aufgaben erstellen, zuweisen und als erledigt markieren
-* **Finanz-Tracker (Basis)** – Ausgaben erfassen, Teilnehmer auswählen und Kosten automatisch aufteilen
+Die Anwendung soll den administrativen Aufwand in einer WG minimieren und die Transparenz erhöhen durch zentrale Datenhaltung und automatische Berechnungen.
 
-### 🚧 Geplante Kernfunktionen
-1. **Shared‑Expense‑Tracker** – Erfassung gemeinsamer Ausgaben mit automatischer Aufteilung der Beträge
-	auf alle Bewohner.
-2. **Task‑Scheduler (Ämtli‑Plan)** – Zuweisung, Rotation und Statusverfolgung von Haushaltspflichten.
-3. **Benutzer­management** – Accounts mit Namen, Kennfarbe und optionalem Profilbild.
-4. **Responsive Web‑Frontend** – Bedienung im Browser; gestaltet mit NiceGUI.
+### Aktuell implementiert
 
+* **Mitbewohner*innen-Verwaltung** – Vollständiges CRUD (Erstellen, Lesen, Bearbeiten, Löschen) von Profilen mit Tastatur-Unterstützung (Enter-Taste) für schnelle Eingabe.
+
+* **Shared-Expense-Tracker** – Erfassung gemeinsamer Ausgaben mit:
+  - Automatischer Berechnung der Anteile pro beteiligte Person (gleichmäßige Aufteilung)
+  - Echtzeit-Berechnung von Kontostanden (Guthaben vs. Schulden)
+  - Ausgleichsvorschläge mit optimiertem Algorithmus zur Minimierung der Überweisungen
+  - Detaillierter Ausgabenverlauf und Löschfunktion
+  - Kategorisierung (Lebensmittel, Haushalt, Miete, Internet, Strom, Putzmittel, Freizeit, Sonstiges) + Custom-Kategorien
+
+* **Ämtli-Plan & Kalender** – Verwaltung von Haushaltsaufgaben mit:
+  - Erstellung und Zuweisung zu Mitbewohner*innen
+  - Checkbox-Status für Completion-Tracking
+  - Interaktive Kalender-Visualisierung mit fälligen Aufgaben
+  - Tastatur-Integration (Enter-Taste zur schnellen Erstellung)
+
+* **Responsive Web-Frontend** – Intuitive, helle Benutzeroberfläche:
+  - Flüssige Bedienung ohne Seiten-Reloads (realisiert mit NiceGUI)
+  - Drei-Tab-Navigation: Mitbewohner*innen | Finanzen | Ämtli & Kalender
+  - Real-time UI-Updates bei Datenänderungen
+  
 ## 3. Technische Architektur
 Die Lösung ist als klassische Drei‑Schichten‑Architektur implementiert:
 
