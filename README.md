@@ -42,7 +42,7 @@ In zukünftigen Entwicklungszyklen soll der Funktionsumfang um folgende Module e
 
 * **Finanz-Reporting & Settlement-Modul**:
   - Monatliche Konsolidierung der Finanzen inklusive automatisierter Generierung von Ausgleichszahlungsvorschlägen und Integration von              Zahlungsreferenzen (z. B. IBAN).
-  -
+  
 * **Integriertes Event- & Terminmanagement**:
   - Erweiterung des Kalenders um soziale Komponenten (z. B. Geburtstage, WG-Events) sowie eine direkte Aufgabenplanung aus der Kalenderansicht      heraus.
 
