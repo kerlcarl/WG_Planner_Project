@@ -1,3 +1,5 @@
+import json
+
 from nicegui import ui
 
 from models import MitbewohnerDB, Task
@@ -13,7 +15,7 @@ def render_tasks_tab(container):
         tasks = session.query(Task).all()
         users = session.query(MitbewohnerDB).all()
         # Datumswerte fuer die Kalender-Markierungen.
-        event_days = [task.created_at.strftime("%Y-%m-%d") for task in tasks if task.created_at]
+        event_days = [task.created_at.strftime("%Y/%m/%d") for task in tasks if task.created_at]
         open_tasks = [t for t in tasks if not t.is_done]
         done_tasks = [t for t in tasks if t.is_done]
 
@@ -87,7 +89,7 @@ def render_tasks_tab(container):
                             "font-size: 0.78rem; color: #94a3b8"
                         )
                 with ui.element("div").classes("px-4 pb-4"):
-                    ui.date().props(f'events={event_days} event-color="orange"').classes("w-full")
+                    ui.date().props(f':events=\'{json.dumps(event_days)}\' event-color="orange"').classes("w-full")
 
             # Offene Aufgaben
             with ui.row().classes("items-center gap-2 mb-3"):
