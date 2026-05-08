@@ -1,7 +1,7 @@
 # Gemeinsame Anwendungslogik und CRUD-Funktionen fuer die UI.
 from nicegui import ui
 
-from models import Expense, MitbewohnerDB, Session, Task
+from models import Expense, ManualDebt, MitbewohnerDB, Session, Task
 
 DEFAULT_EXPENSE_CATEGORIES = [
     "Lebensmittel",
@@ -29,6 +29,13 @@ def calculate_balances() -> dict[int, float]:
         for user in expense.participants:
             balances[user.id] -= share
         balances[expense.paid_by_id] += expense.amount
+
+    # Manuelle Schulden in die Kontostände einrechnen
+    for debt in session.query(ManualDebt).all():
+        if debt.from_user_id in balances:
+            balances[debt.from_user_id] -= debt.amount
+        if debt.to_user_id in balances:
+            balances[debt.to_user_id] += debt.amount
 
     session.close()
     return balances
@@ -137,6 +144,63 @@ def delete_expense(expense, callback):
         session.commit()
     session.close()
     ui.notify("Ausgabe geloescht", color="negative")
+    callback()
+
+
+def create_manual_debt(from_id, to_id, amount, method, description, callback):
+    session = get_session()
+    desc = description.strip() if description.strip() else f"Offene Rechnung via {method}"
+
+    existing = session.query(ManualDebt).filter(
+        ManualDebt.from_user_id == from_id,
+        ManualDebt.to_user_id == to_id,
+    ).first()
+
+    if existing:
+        existing.amount = round(existing.amount + amount, 2)
+        if desc:
+            existing.description = (
+                f"{existing.description}, {desc}" if existing.description else desc
+            )
+        existing.payment_method = method
+        msg = f"Rechnung aktualisiert – neu CHF {existing.amount:.2f}"
+    else:
+        session.add(ManualDebt(
+            description=desc,
+            amount=amount,
+            payment_method=method,
+            from_user_id=from_id,
+            to_user_id=to_id,
+        ))
+        msg = "Offene Rechnung erfasst"
+
+    session.commit()
+    session.close()
+    ui.notify(msg, color="positive")
+    callback()
+
+
+def delete_manual_debt(debt_id, callback):
+    session = get_session()
+    debt = session.get(ManualDebt, debt_id)
+    if debt:
+        session.delete(debt)
+        session.commit()
+    session.close()
+    ui.notify("Ausgleich als bezahlt markiert", color="positive")
+    callback()
+
+
+def delete_manual_debts_by_pair(from_id: int, to_id: int, callback) -> None:
+    """Löscht alle offenen Schulden zwischen zwei Personen auf einmal."""
+    session = get_session()
+    session.query(ManualDebt).filter(
+        ManualDebt.from_user_id == from_id,
+        ManualDebt.to_user_id == to_id,
+    ).delete()
+    session.commit()
+    session.close()
+    ui.notify("Ausgleich als bezahlt markiert", color="positive")
     callback()
 
 

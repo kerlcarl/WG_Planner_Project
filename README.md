@@ -25,6 +25,8 @@ ist ein einfacher Mitbewohner‑Verwaltungsbildschirm implementiert; die folgend
 2. **Task‑Scheduler (Ämtli‑Plan)** – Zuweisung, Rotation und Statusverfolgung von Haushaltspflichten.
 3. **Benutzer­management** – Accounts mit Namen, Kennfarbe und optionalem Profilbild.
 4. **Responsive Web‑Frontend** – Bedienung im Browser; gestaltet mit NiceGUI.
+5. **Modernes UI‑Design** – Ansprechendere und kreativere Benutzeroberfläche mit durchdachtem Farbkonzept,
+	ansprechenden Bildern und modernen UI‑Elementen, um die Nutzungserfahrung deutlich zu verbessern.
 
 ## 3. Technische Architektur
 Die Lösung ist als klassische Drei‑Schichten‑Architektur implementiert:

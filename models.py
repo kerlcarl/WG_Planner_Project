@@ -57,6 +57,23 @@ class Task(Base):
     assigned_to = relationship("MitbewohnerDB", back_populates="tasks")
 
 
+class ManualDebt(Base):
+    """Manuell erfasste offene Schuld, die in den Ausgleichsvorschlägen erscheint."""
+    __tablename__ = 'manual_debts'
+
+    id: int = Column(Integer, primary_key=True)
+    description: str = Column(String, nullable=False)
+    amount: float = Column(Float, nullable=False)
+    payment_method: str = Column(String, default='Twint')
+    created_at = Column(DateTime, default=datetime.now)
+
+    from_user_id = Column(Integer, ForeignKey('users.id'))
+    to_user_id = Column(Integer, ForeignKey('users.id'))
+
+    from_user = relationship("MitbewohnerDB", foreign_keys=[from_user_id])
+    to_user = relationship("MitbewohnerDB", foreign_keys=[to_user_id])
+
+
 class Expense(Base):
     """
     Repräsentiert eine finanzielle Ausgabe.

@@ -1,8 +1,16 @@
-# Darstellung des Tabs fuer Mitbewohner*innen.
 from nicegui import ui
 
 from models import MitbewohnerDB
 from services import add_user, delete_user, edit_user, get_session
+
+_AVATAR_PALETTE = [
+    "#6366f1", "#8b5cf6", "#10b981", "#f59e0b",
+    "#ef4444", "#06b6d4", "#ec4899", "#f97316",
+]
+
+
+def _avatar_color(name: str) -> str:
+    return _AVATAR_PALETTE[sum(ord(c) for c in name) % len(_AVATAR_PALETTE)]
 
 
 def render_users_tab(container, on_users_changed=None):
@@ -12,18 +20,55 @@ def render_users_tab(container, on_users_changed=None):
             on_users_changed()
 
     with container:
-        with ui.card().classes("w-full mb-4 p-4 shadow-md"):
-            ui.label("Neue*n Mitbewohner*in hinzufuegen").classes("text-h6 text-blue-700 font-bold")
-            name_input = ui.input("Name")
+        # Hero-Banner
+        with ui.element("div").style(
+            "background: linear-gradient(135deg, #ede9fe 0%, #dbeafe 100%); "
+            "border-radius: 20px; padding: 28px 32px; margin-bottom: 20px; "
+            "box-shadow: 0 2px 16px rgba(99,102,241,0.12)"
+        ):
+            with ui.row().classes("items-center gap-4"):
+                with ui.element("div").style(
+                    "background: #6366f1; border-radius: 16px; width: 56px; height: 56px; "
+                    "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                ):
+                    ui.icon("people").style("color: white; font-size: 2rem")
+                with ui.column().classes("gap-0"):
+                    ui.label("Mitbewohner*innen").style(
+                        "font-size: 1.4rem; font-weight: 800; color: #3730a3; line-height: 1.2"
+                    )
+                    ui.label("Verwalte alle Personen in deiner WG").style(
+                        "color: #6366f1; font-size: 0.85rem; margin-top: 4px"
+                    )
+
+        # Formular-Karte
+        with ui.card().classes("w-full mb-5").style(
+            "border-radius: 18px; box-shadow: 0 4px 20px rgba(99,102,241,0.10); "
+            "border: 1.5px solid #e0e7ff; padding: 22px"
+        ):
+            with ui.row().classes("items-center gap-3 mb-3"):
+                ui.icon("person_add").style("color: #6366f1; font-size: 1.4rem")
+                ui.label("Neue*n Mitbewohner*in hinzufügen").style(
+                    "font-size: 1rem; font-weight: 700; color: #3730a3"
+                )
+
+            name_input = ui.input("Name", placeholder="z.B. Anna Müller").classes("w-full")
 
             def handle_add():
                 if name_input.value:
                     add_user(name_input, handle_users_changed)
 
             name_input.on("keydown.enter", handle_add)
-            ui.button("Hinzufuegen", on_click=handle_add).classes("w-full bg-blue-600 text-white mt-2")
+            ui.button("Hinzufügen", icon="add", on_click=handle_add).classes(
+                "w-full bg-indigo-600 text-white mt-3"
+            ).style("border-radius: 10px; font-weight: 600")
 
-        ui.label("Aktuelle Mitbewohner*innen").classes("text-h6 mt-4 mb-2 font-bold")
+        # Listenüberschrift
+        with ui.row().classes("items-center gap-2 mb-3"):
+            ui.icon("group").style("color: #6366f1; font-size: 1.2rem")
+            ui.label("Aktuelle Mitbewohner*innen").style(
+                "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
+            )
+
         list_items_container = ui.column().classes("w-full")
 
     def refresh_list():
@@ -33,20 +78,55 @@ def render_users_tab(container, on_users_changed=None):
 
         with list_items_container:
             if not users:
-                ui.label("Noch keine Mitbewohner*innen vorhanden.").classes("text-gray-500 italic p-4")
-            for user in users:
-                with ui.card().classes("w-full border-l-4 border-blue-500 shadow-sm mb-2"):
-                    with ui.row().classes("w-full items-center justify-between p-2"):
-                        ui.label(user.name).classes("text-bold text-lg")
-                        with ui.row().classes("gap-1"):
-                            ui.button(
-                                icon="edit",
-                                on_click=lambda current_user=user: edit_user(current_user, handle_users_changed),
-                            ).props("flat round")
-                            ui.button(
-                                icon="delete",
-                                on_click=lambda current_user=user: delete_user(current_user, handle_users_changed),
-                            ).props("flat round color=red")
+                with ui.element("div").style(
+                    "text-align: center; padding: 48px 20px; background: #f8f8ff; "
+                    "border-radius: 18px; border: 2px dashed #c7d2fe"
+                ):
+                    ui.icon("group_add").style("color: #a5b4fc; font-size: 3.5rem")
+                    ui.label("Noch keine Mitbewohner*innen vorhanden.").style(
+                        "color: #818cf8; margin-top: 10px; font-weight: 600"
+                    )
+                    ui.label("Füge oben deine erste Person hinzu!").style(
+                        "color: #a5b4fc; font-size: 0.85rem; margin-top: 4px"
+                    )
+            else:
+                for user in users:
+                    color = _avatar_color(user.name)
+                    with ui.card().classes("w-full mb-3").style(
+                        f"border-radius: 16px; box-shadow: 0 2px 14px rgba(0,0,0,0.07); "
+                        f"border-left: 5px solid {color}; padding: 0; overflow: hidden"
+                    ):
+                        with ui.row().classes("w-full items-center justify-between").style(
+                            "padding: 14px 18px"
+                        ):
+                            with ui.row().classes("items-center gap-3"):
+                                ui.html(
+                                    f'<div style="background:{color}; border-radius:50%; '
+                                    f'width:44px; height:44px; display:flex; align-items:center; '
+                                    f'justify-content:center; color:white; font-size:1.15rem; '
+                                    f'font-weight:800; flex-shrink:0">'
+                                    f'{user.name[0].upper()}</div>'
+                                )
+                                with ui.column().classes("gap-0"):
+                                    ui.label(user.name).style(
+                                        "font-weight: 700; font-size: 1rem; color: #1e1b4b"
+                                    )
+                                    ui.label("Mitbewohner*in").style(
+                                        "font-size: 0.73rem; color: #94a3b8; margin-top: 2px"
+                                    )
+                            with ui.row().classes("gap-1"):
+                                ui.button(
+                                    icon="edit",
+                                    on_click=lambda current_user=user: edit_user(
+                                        current_user, handle_users_changed
+                                    ),
+                                ).props("flat round").style("color: #6366f1")
+                                ui.button(
+                                    icon="delete",
+                                    on_click=lambda current_user=user: delete_user(
+                                        current_user, handle_users_changed
+                                    ),
+                                ).props("flat round color=red")
 
         session.close()
 
