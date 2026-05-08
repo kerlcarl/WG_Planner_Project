@@ -13,7 +13,9 @@ def _avatar_color(name: str) -> str:
     return _AVATAR_PALETTE[sum(ord(c) for c in name) % len(_AVATAR_PALETTE)]
 
 
+# Rendert den Benutzer-Tab inklusive Formular und Liste.
 def render_users_tab(container, on_users_changed=None):
+    # Zentraler Refresh-Hook, damit auch andere Tabs aktualisiert werden koennen.
     def handle_users_changed():
         refresh_list()
         if on_users_changed:
@@ -71,6 +73,7 @@ def render_users_tab(container, on_users_changed=None):
 
         list_items_container = ui.column().classes("w-full")
 
+    # Liest Benutzer aus der DB und rendert Karten inkl. Edit/Delete.
     def refresh_list():
         list_items_container.clear()
         session = get_session()

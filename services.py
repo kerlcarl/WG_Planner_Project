@@ -15,16 +15,19 @@ DEFAULT_EXPENSE_CATEGORIES = [
 ]
 
 
+# Liefert fuer jeden Aufruf eine frische SQLAlchemy-Session.
 def get_session():
     return Session()
 
 
+# Berechnet den Kontostand pro Benutzer aus allen Ausgaben.
 def calculate_balances() -> dict[int, float]:
     session = get_session()
     users = session.query(MitbewohnerDB).all()
     balances = {user.id: 0.0 for user in users}
 
     for expense in session.query(Expense).all():
+        # Anteil fuer jeden Teilnehmer abziehen, Gesamtbetrag beim Zahler gutschreiben.
         share = expense.calculate_share()
         for user in expense.participants:
             balances[user.id] -= share
@@ -41,6 +44,7 @@ def calculate_balances() -> dict[int, float]:
     return balances
 
 
+# Erstellt konkrete Ausgleichszahlungen aus den berechneten Salden.
 def calculate_settlements() -> list[dict[str, float | int]]:
     balances = calculate_balances()
     settlements: list[dict[str, float | int]] = []
@@ -64,6 +68,7 @@ def calculate_settlements() -> list[dict[str, float | int]]:
         debtor = debtors[debtor_index]
         transfer_amount = round(min(creditor["amount"], debtor["amount"]), 2)
 
+        # Nur sinnvolle (nicht triviale) Transfers speichern.
         if transfer_amount > 0.01:
             settlements.append(
                 {
@@ -84,6 +89,7 @@ def calculate_settlements() -> list[dict[str, float | int]]:
     return settlements
 
 
+# Summiert Ausgaben je Kategorie fuer die Statistik-Kacheln.
 def calculate_category_totals() -> list[dict[str, float]]:
     session = get_session()
     totals: dict[str, float] = {}
@@ -100,6 +106,7 @@ def calculate_category_totals() -> list[dict[str, float]]:
     ]
 
 
+# Legt einen neuen Benutzer an und informiert die UI.
 def add_user(input_field, callback):
     session = get_session()
     session.add(MitbewohnerDB(name=input_field.value.strip()))
@@ -110,6 +117,7 @@ def add_user(input_field, callback):
     callback()
 
 
+# Legt eine neue Ausgabe mit Teilnehmern an.
 def save_expense(desc, amt, cat, payer, parts, callback):
     if not desc.value or not amt.value or not payer.value or not cat.value:
         ui.notify("Bitte alle Pflichtfelder ausfuellen", color="warning")
@@ -124,6 +132,7 @@ def save_expense(desc, amt, cat, payer, parts, callback):
     )
 
     if parts.value:
+        # Viele-zu-viele Verknuepfung ueber expense.participants.
         for participant_id in parts.value:
             user = session.get(MitbewohnerDB, participant_id)
             if user:
@@ -136,6 +145,7 @@ def save_expense(desc, amt, cat, payer, parts, callback):
     callback()
 
 
+# Entfernt eine Ausgabe dauerhaft aus der Datenbank.
 def delete_expense(expense, callback):
     session = get_session()
     expense_to_delete = session.get(Expense, expense.id)
@@ -216,6 +226,7 @@ def save_task(title, who, callback):
     callback()
 
 
+# Markiert eine Aufgabe als erledigt/nicht erledigt.
 def update_task_status(task, value, callback):
     session = get_session()
     task.is_done = value
@@ -225,6 +236,7 @@ def update_task_status(task, value, callback):
     callback()
 
 
+# Loescht einen Benutzer.
 def delete_user(user, callback):
     session = get_session()
     user_to_delete = session.get(MitbewohnerDB, user.id)
@@ -236,6 +248,7 @@ def delete_user(user, callback):
     callback()
 
 
+# Oeffnet den Bearbeiten-Dialog fuer einen Benutzer.
 def edit_user(user, callback):
     with ui.dialog() as dialog, ui.card():
         ui.label(f"Bearbeite {user.name}").classes("text-h6")
@@ -249,6 +262,7 @@ def edit_user(user, callback):
     dialog.open()
 
 
+# Speichert den geaenderten Benutzernamen.
 def save_user_edit(user_id, new_name, dialog):
     session = get_session()
     user = session.get(MitbewohnerDB, user_id)

@@ -16,6 +16,8 @@ expense_participants = Table(
     Column('user_id', Integer, ForeignKey('users.id'), primary_key=True)
 )
 
+
+# Tabelle fuer Mitbewohner inklusive Relationen zu Aufgaben und Ausgaben.
 class MitbewohnerDB(Base):
     """
     Repräsentiert einen WG-Bewohner.
@@ -101,12 +103,15 @@ class Expense(Base):
         """
         if not self.participants:
             return 0.0
+        # Gleichmaessige Aufteilung auf alle Teilnehmer.
         return self.amount / len(self.participants)
 
 
 # --- Datenbank Initialisierung (Unit 6) ---
 DATABASE_URL = 'sqlite:///wg_planner.db'
+# SQLite-Engine; check_same_thread=False ist fuer UI-Threads noetig.
 engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})
+# Session-Factory fuer DB-Zugriffe in services.py.
 Session = sessionmaker(bind=engine)
 
 def init_db():

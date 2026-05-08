@@ -16,10 +16,13 @@ from services import (
 _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
 
 
+# Rendert den Finanz-Tab und liefert eine Refresh-Funktion fuer Neuaufbau.
 def render_finances_tab(container):
+    # Liest aktuelle Daten, berechnet Kennzahlen und baut alle UI-Karten neu.
     def refresh():
         container.clear()
         session = get_session()
+        # Abgeleitete Werte werden zur Laufzeit berechnet (nicht separat gespeichert).
         balances = calculate_balances()
         category_totals = calculate_category_totals()
         settlements = calculate_settlements()
@@ -87,6 +90,7 @@ def render_finances_tab(container):
                     ui.button(icon="close", on_click=expense_dialog.close).props("flat round")
 
                 with ui.column().classes("w-full gap-4 px-5 pb-5 pt-3"):
+                    # Formfelder fuer neue Ausgabe.
                     desc = ui.input("Beschreibung").classes("w-full")
                     with ui.row().classes("w-full gap-4"):
                         amt = ui.number("Betrag (CHF)", format="%.2f").classes("w-full")
@@ -133,6 +137,7 @@ def render_finances_tab(container):
                     class _CategoryField:
                         @property
                         def value(self):
+                            # Nutzt freie Eingabe nur bei "Andere...".
                             if cat_select.value == "Andere...":
                                 return custom_category.value.strip()
                             return cat_select.value
@@ -144,6 +149,7 @@ def render_finances_tab(container):
                             expense_dialog.close()
                             refresh()
 
+                        # Persistiert die Ausgabe in services.py und aktualisiert danach den Tab.
                         save_expense(desc, amt, category_field, payer, parts, refresh_and_close)
 
                     desc.on("keydown.enter", handle_save)
@@ -166,6 +172,7 @@ def render_finances_tab(container):
                             )
                     with ui.column().classes("w-full gap-2 p-4 pt-1"):
                         for user in users:
+                            # Anzeige des aktuellen Saldos je Person.
                             balance = balances.get(user.id, 0.0)
                             is_positive = balance >= 0
                             color = "text-green-700" if is_positive else "text-red-700"
@@ -195,6 +202,7 @@ def render_finances_tab(container):
                             ui.label("Kostenverteilung auf einen Blick").classes("text-xs text-gray-400")
                     with ui.column().classes("w-full gap-2 p-4 pt-1"):
                         if category_totals:
+                            # Balkenlaenge relativ zur groessten Kategorie.
                             highest_total = category_totals[0]["amount"]
                             for item in category_totals:
                                 width_percent = 100 if highest_total <= 0 else max(
