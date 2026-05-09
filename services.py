@@ -1,7 +1,9 @@
 # Gemeinsame Anwendungslogik und CRUD-Funktionen fuer die UI.
+from datetime import datetime
+
 from nicegui import ui
 
-from models import Expense, ManualDebt, MitbewohnerDB, Session, Task
+from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Session, Task
 
 DEFAULT_EXPENSE_CATEGORIES = [
     "Lebensmittel",
@@ -214,15 +216,23 @@ def delete_manual_debts_by_pair(from_id: int, to_id: int, callback) -> None:
     callback()
 
 
-def save_task(title, who, callback):
+def save_task(title, who, due_date_str, callback):
     if not title.value:
         return
 
+    due_date = None
+    if due_date_str:
+        try:
+            due_date = datetime.strptime(due_date_str, "%d.%m.%Y")
+        except ValueError:
+            ui.notify("Ungültiges Datum – bitte TT.MM.JJJJ verwenden", color="warning")
+            return
+
     session = get_session()
-    session.add(Task(title=title.value, assigned_to_id=who.value))
+    session.add(Task(title=title.value, assigned_to_id=who.value, due_date=due_date))
     session.commit()
     session.close()
-    ui.notify("Neues Aemtli erstellt", color="positive")
+    ui.notify("Neues Ämtli erstellt", color="positive")
     callback()
 
 
@@ -260,6 +270,82 @@ def edit_user(user, callback):
             )
             ui.button("Abbrechen", on_click=dialog.close).props("flat")
     dialog.open()
+
+
+# ── Blog ──────────────────────────────────────────────────────────────────────
+
+def add_post(author_id, content, is_important, callback):
+    session = get_session()
+    session.add(Post(author_id=author_id, content=content.strip(), is_important=is_important))
+    session.commit()
+    session.close()
+    ui.notify("Nachricht veröffentlicht", color="positive")
+    callback()
+
+
+def delete_post(post_id, callback):
+    session = get_session()
+    post = session.get(Post, post_id)
+    if post:
+        session.delete(post)
+        session.commit()
+    session.close()
+    callback()
+
+
+def toggle_post_important(post_id, callback):
+    session = get_session()
+    post = session.get(Post, post_id)
+    if post:
+        post.is_important = not post.is_important
+        session.commit()
+    session.close()
+    callback()
+
+
+# ── Einkaufsliste ──────────────────────────────────────────────────────────────
+
+def add_shopping_item(name, menge, einheit, author_id, callback):
+    session = get_session()
+    session.add(EinkaufsItem(
+        name=name.strip(),
+        menge=menge.strip() if menge else None,
+        einheit=einheit.strip() if einheit else None,
+        author_id=author_id,
+    ))
+    session.commit()
+    session.close()
+    ui.notify(f'"{name}" hinzugefügt', color="positive")
+    callback()
+
+
+def toggle_shopping_item(item_id, is_bought, callback):
+    session = get_session()
+    item = session.get(EinkaufsItem, item_id)
+    if item:
+        item.is_bought = is_bought
+        session.commit()
+    session.close()
+    callback()
+
+
+def delete_shopping_item(item_id, callback):
+    session = get_session()
+    item = session.get(EinkaufsItem, item_id)
+    if item:
+        session.delete(item)
+        session.commit()
+    session.close()
+    callback()
+
+
+def delete_bought_items(callback):
+    session = get_session()
+    session.query(EinkaufsItem).filter(EinkaufsItem.is_bought == True).delete()
+    session.commit()
+    session.close()
+    ui.notify("Erledigte Artikel gelöscht", color="positive")
+    callback()
 
 
 # Speichert den geaenderten Benutzernamen.

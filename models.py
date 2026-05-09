@@ -1,7 +1,7 @@
 # Datenmodelle und SQLAlchemy-Konfiguration fuer den WG-Planner.
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, create_engine
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, create_engine, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # Basis-Klasse für SQLAlchemy (Unit 6/7 Thema)
@@ -57,6 +57,30 @@ class Task(Base):
     # Foreign Key zu Mitbewohner (Unit 7)
     assigned_to_id = Column(Integer, ForeignKey('users.id'))
     assigned_to = relationship("MitbewohnerDB", back_populates="tasks")
+
+
+class Post(Base):
+    __tablename__ = 'posts'
+
+    id = Column(Integer, primary_key=True)
+    content = Column(String, nullable=False)
+    is_important = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    author_id = Column(Integer, ForeignKey('users.id'))
+    author = relationship("MitbewohnerDB", foreign_keys=[author_id])
+
+
+class EinkaufsItem(Base):
+    __tablename__ = 'shopping_items'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    menge = Column(String, nullable=True)
+    einheit = Column(String, nullable=True)
+    is_bought = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    author_id = Column(Integer, ForeignKey('users.id'))
+    author = relationship("MitbewohnerDB", foreign_keys=[author_id])
 
 
 class ManualDebt(Base):
@@ -117,3 +141,9 @@ Session = sessionmaker(bind=engine)
 def init_db():
     """Erstellt alle Tabellen basierend auf den Modellen."""
     Base.metadata.create_all(engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN due_date DATETIME"))
+            conn.commit()
+        except Exception:
+            pass  # Spalte existiert bereits

@@ -1,0 +1,386 @@
+from datetime import datetime
+
+from nicegui import ui
+
+from models import EinkaufsItem, MitbewohnerDB, Post
+from services import (
+    add_post,
+    add_shopping_item,
+    delete_bought_items,
+    delete_post,
+    delete_shopping_item,
+    get_session,
+    toggle_post_important,
+    toggle_shopping_item,
+)
+
+_BLOG_PALETTE = [
+    "#7c3aed", "#6d28d9", "#5b21b6", "#4c1d95",
+    "#8b5cf6", "#6366f1", "#4f46e5", "#7e22ce",
+]
+
+
+def _blog_color(name: str) -> str:
+    return _BLOG_PALETTE[sum(ord(c) for c in name) % len(_BLOG_PALETTE)]
+
+
+def render_collab_tab(container):
+    _timers: list = []
+
+    def _build():
+        for t in _timers:
+            t.cancel()
+        _timers.clear()
+        container.clear()
+
+        sess = get_session()
+        users = sess.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
+        users_dict = {u.id: u.name for u in users}
+        first_id = users[0].id if users else None
+        sess.close()
+
+        with container:
+            # ── Hero ────────────────────────────────────────────────────────────
+            with ui.element("div").style(
+                "background: linear-gradient(135deg, #0891b2 0%, #0c6c85 55%, #164e63 100%); "
+                "border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; "
+                "box-shadow: 0 4px 24px rgba(8,145,178,0.22)"
+            ):
+                with ui.row().classes("items-center gap-4"):
+                    with ui.element("div").style(
+                        "background: rgba(255,255,255,0.18); border-radius: 16px; "
+                        "width: 56px; height: 56px; display: flex; align-items: center; "
+                        "justify-content: center; flex-shrink: 0"
+                    ):
+                        ui.icon("groups").style("color: white; font-size: 2rem")
+                    with ui.column().classes("gap-0"):
+                        ui.label("Kollaborations-Hub").style(
+                            "font-size: 1.4rem; font-weight: 800; color: white; line-height: 1.2"
+                        )
+                        ui.label("WG-Blog & Echtzeit-Einkaufsliste").style(
+                            "color: rgba(255,255,255,0.72); font-size: 0.85rem; margin-top: 4px"
+                        )
+
+            # ══════════════════════════════════════════════════════════════════
+            # BLOG
+            # ══════════════════════════════════════════════════════════════════
+            with ui.row().classes("items-center gap-3 mb-4"):
+                with ui.element("div").style(
+                    "background: #7c3aed; border-radius: 10px; width: 34px; height: 34px; "
+                    "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                ):
+                    ui.icon("campaign").style("color: white; font-size: 1.15rem")
+                with ui.column().classes("gap-0"):
+                    ui.label("WG-Blog").style(
+                        "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
+                    )
+                    ui.label("Schwarzes Brett der WG").style(
+                        "font-size: 0.78rem; color: #94a3b8"
+                    )
+
+            # Blog-Formular
+            with ui.card().classes("w-full mb-5").style(
+                "border-radius: 18px; border: 1.5px solid #ede9fe; "
+                "box-shadow: 0 4px 16px rgba(124,58,237,0.07); padding: 20px"
+            ):
+                with ui.row().classes("items-center gap-2 mb-3"):
+                    ui.icon("edit_note").style("color: #7c3aed; font-size: 1.3rem")
+                    ui.label("Neue Nachricht verfassen").style(
+                        "font-weight: 700; color: #4c1d95; font-size: 0.95rem"
+                    )
+
+                blog_author = ui.select(
+                    users_dict, value=first_id, label="Absender*in"
+                ).classes("w-full")
+                blog_content = ui.textarea(
+                    "Inhalt", placeholder="Was möchtest du der WG mitteilen?"
+                ).classes("w-full mt-2").props("rows=3 outlined")
+                blog_important = ui.checkbox("Als wichtig markieren").classes("mt-1")
+                blog_important.style("color: #dc2626")
+
+                ui.button(
+                    "Veröffentlichen", icon="send",
+                    on_click=lambda: handle_post(),
+                ).props("unelevated").classes("bg-violet-700 text-white mt-3").style(
+                    "border-radius: 10px; font-weight: 600"
+                )
+
+            # Blog-Feed (dynamisch — wird von refresh_blog() befüllt)
+            blog_feed = ui.column().classes("w-full mb-8")
+
+            # ══════════════════════════════════════════════════════════════════
+            # EINKAUFSLISTE
+            # ══════════════════════════════════════════════════════════════════
+            ui.separator().classes("mb-6")
+
+            with ui.row().classes("items-center justify-between mb-4 flex-wrap gap-2"):
+                with ui.row().classes("items-center gap-3"):
+                    with ui.element("div").style(
+                        "background: #059669; border-radius: 10px; width: 34px; height: 34px; "
+                        "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                    ):
+                        ui.icon("shopping_cart").style("color: white; font-size: 1.15rem")
+                    with ui.column().classes("gap-0"):
+                        ui.label("Einkaufsliste").style(
+                            "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
+                        )
+                        ui.label("Echtzeit-Sync für alle Mitbewohner*innen").style(
+                            "font-size: 0.78rem; color: #94a3b8"
+                        )
+                sync_label = ui.label("").style(
+                    "font-size: 0.68rem; color: #94a3b8; background: #f1f5f9; "
+                    "padding: 3px 10px; border-radius: 999px; font-family: monospace"
+                )
+
+            # Einkauf-Formular
+            with ui.card().classes("w-full mb-5").style(
+                "border-radius: 18px; border: 1.5px solid #d1fae5; "
+                "box-shadow: 0 4px 16px rgba(5,150,105,0.07); padding: 20px"
+            ):
+                with ui.row().classes("items-center gap-2 mb-3"):
+                    ui.icon("add_shopping_cart").style("color: #059669; font-size: 1.3rem")
+                    ui.label("Artikel hinzufügen").style(
+                        "font-weight: 700; color: #065f46; font-size: 0.95rem"
+                    )
+
+                shop_name = ui.input("Artikel *", placeholder="z. B. Milch").classes("w-full")
+                with ui.row().classes("w-full gap-2 mt-2"):
+                    shop_menge = ui.input("Menge", placeholder="z. B. 2").classes("flex-1")
+                    shop_einheit = ui.input("Einheit", placeholder="z. B. Liter").classes("flex-1")
+                shop_author = ui.select(
+                    users_dict, value=first_id, label="Hinzugefügt von"
+                ).classes("w-full mt-2")
+
+                shop_name.on("keydown.enter", lambda: handle_add_item())
+                ui.button(
+                    "Hinzufügen", icon="add",
+                    on_click=lambda: handle_add_item(),
+                ).props("unelevated").classes("w-full bg-emerald-600 text-white mt-3").style(
+                    "border-radius: 10px; font-weight: 600"
+                )
+
+            # Einkaufsliste (dynamisch — wird von refresh_shop() befüllt)
+            shop_list = ui.column().classes("w-full")
+
+        # ── Refresh-Funktionen ───────────────────────────────────────────────
+        # WICHTIG: Alle Relationship-Attribute (z. B. post.author.name) werden
+        # innerhalb der offenen Session in Dicts kopiert, BEVOR sess.close()
+        # aufgerufen wird. Sonst schlägt SQLAlchemy Lazy-Loading fehl.
+
+        def refresh_blog():
+            blog_feed.clear()
+            sess = get_session()
+            posts = sess.query(Post).order_by(Post.created_at.desc()).all()
+            # Daten materialisieren – Session muss noch offen sein
+            rows = [
+                {
+                    "id": p.id,
+                    "content": p.content,
+                    "is_important": p.is_important,
+                    "created_at": p.created_at,
+                    "author_name": p.author.name if p.author else "Unbekannt",
+                }
+                for p in posts
+            ]
+            sess.close()
+
+            with blog_feed:
+                if not rows:
+                    with ui.element("div").style(
+                        "text-align: center; padding: 40px 20px; background: #faf5ff; "
+                        "border-radius: 16px; border: 2px dashed #ddd6fe"
+                    ):
+                        ui.icon("forum").style("color: #c4b5fd; font-size: 3.5rem")
+                        ui.label("Noch keine Nachrichten").style(
+                            "color: #8b5cf6; font-weight: 600; margin-top: 10px"
+                        )
+                        ui.label("Verfasse oben den ersten WG-Beitrag!").style(
+                            "color: #c4b5fd; font-size: 0.82rem; margin-top: 4px"
+                        )
+                    return
+
+                for row in rows:
+                    imp = row["is_important"]
+                    author_name = row["author_name"]
+                    ts = row["created_at"].strftime("%d.%m.%Y · %H:%M") if row["created_at"] else ""
+                    post_id = row["id"]
+                    color = _blog_color(author_name)
+
+                    with ui.card().classes("w-full mb-3").style(
+                        ("border-radius: 14px; border-left: 5px solid #dc2626; background: #fff5f5; "
+                         if imp else
+                         "border-radius: 14px; border-left: 5px solid #ede9fe; background: white; ")
+                        + "padding: 0; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05)"
+                    ):
+                        with ui.element("div").style("padding: 14px 16px"):
+                            with ui.row().classes("w-full items-start justify-between gap-2 flex-wrap"):
+                                with ui.row().classes("items-center gap-3"):
+                                    ui.html(
+                                        f'<div style="background:{color};border-radius:50%;'
+                                        f'width:38px;height:38px;display:flex;align-items:center;'
+                                        f'justify-content:center;color:white;font-weight:800;'
+                                        f'font-size:0.95rem;flex-shrink:0">'
+                                        f'{author_name[0].upper()}</div>'
+                                    )
+                                    with ui.column().classes("gap-0"):
+                                        with ui.row().classes("items-center gap-2 flex-wrap"):
+                                            ui.label(author_name).style(
+                                                "font-weight: 700; color: #1e1b4b; font-size: 0.9rem"
+                                            )
+                                            if imp:
+                                                ui.label("WICHTIG").style(
+                                                    "background: #dc2626; color: white; "
+                                                    "border-radius: 999px; font-size: 0.62rem; "
+                                                    "font-weight: 800; padding: 2px 8px"
+                                                )
+                                        ui.label(ts).style("font-size: 0.72rem; color: #94a3b8")
+                                with ui.row().classes("gap-1 flex-shrink-0"):
+                                    ui.button(
+                                        icon="star" if imp else "star_outline",
+                                        on_click=lambda pid=post_id: toggle_post_important(pid, refresh_blog),
+                                    ).props("flat round dense").style(
+                                        "color: #dc2626" if imp else "color: #d4d4d4"
+                                    )
+                                    ui.button(
+                                        icon="delete",
+                                        on_click=lambda pid=post_id: delete_post(pid, refresh_blog),
+                                    ).props("flat round dense").style("color: #ef4444")
+                            ui.label(row["content"]).style(
+                                "color: #374151; font-size: 0.88rem; margin-top: 10px; "
+                                "white-space: pre-wrap; word-break: break-word; line-height: 1.55"
+                            )
+
+        def _render_shop_row(row: dict, refresh_fn):
+            """Rendert eine einzelne Einkaufslisten-Zeile aus einem Dict."""
+            is_bought = row["is_bought"]
+            item_id = row["id"]
+            author_name = row["author_name"]
+            parts = [row["name"]]
+            if row["menge"] or row["einheit"]:
+                qty = " ".join(p for p in [row["menge"], row["einheit"]] if p)
+                parts.append(qty)
+            label = " · ".join(parts)
+
+            with ui.card().classes("w-full mb-2").style(
+                "border-radius: 12px; padding: 0; overflow: hidden; "
+                + ("background: #f8fafc; box-shadow: none;"
+                   if is_bought else
+                   "background: white; box-shadow: 0 2px 8px rgba(5,150,105,0.07);")
+            ):
+                with ui.row().classes("w-full items-center p-3 gap-2"):
+                    ui.checkbox(
+                        value=is_bought,
+                        on_change=lambda e, iid=item_id: toggle_shopping_item(iid, e.value, refresh_fn),
+                    ).style("flex-shrink: 0; color: #059669")
+                    with ui.column().classes("flex-grow gap-0"):
+                        ui.label(label).style(
+                            "font-size: 0.88rem; "
+                            + ("font-weight: 500; color: #94a3b8; text-decoration: line-through"
+                               if is_bought else
+                               "font-weight: 700; color: #1e1b4b")
+                        )
+                        ui.label(f"von {author_name}").style(
+                            "font-size: 0.7rem; color: #94a3b8; margin-top: 1px"
+                        )
+                    ui.button(
+                        icon="close",
+                        on_click=lambda iid=item_id: delete_shopping_item(iid, refresh_fn),
+                    ).props("flat round dense").style("color: #d1d5db; flex-shrink: 0")
+
+        def refresh_shop():
+            shop_list.clear()
+            sync_label.text = f"⟳ {datetime.now().strftime('%H:%M:%S')}"
+            sess = get_session()
+            items = sess.query(EinkaufsItem).order_by(EinkaufsItem.created_at.asc()).all()
+            # Daten materialisieren – Session muss noch offen sein
+            rows = [
+                {
+                    "id": i.id,
+                    "name": i.name,
+                    "menge": i.menge,
+                    "einheit": i.einheit,
+                    "is_bought": i.is_bought,
+                    "author_name": i.author.name if i.author else "?",
+                }
+                for i in items
+            ]
+            sess.close()
+
+            active = [r for r in rows if not r["is_bought"]]
+            bought = [r for r in rows if r["is_bought"]]
+
+            with shop_list:
+                if not rows:
+                    with ui.element("div").style(
+                        "text-align: center; padding: 40px 20px; background: #f0fdf4; "
+                        "border-radius: 16px; border: 2px dashed #a7f3d0"
+                    ):
+                        ui.icon("shopping_basket").style("color: #6ee7b7; font-size: 3.5rem")
+                        ui.label("Einkaufsliste ist leer").style(
+                            "color: #10b981; font-weight: 600; margin-top: 10px"
+                        )
+                        ui.label("Füge oben den ersten Artikel hinzu!").style(
+                            "color: #6ee7b7; font-size: 0.82rem; margin-top: 4px"
+                        )
+                    return
+
+                if active:
+                    ui.label(f"ZU KAUFEN  ({len(active)})").style(
+                        "font-size: 0.72rem; font-weight: 700; color: #059669; "
+                        "letter-spacing: 0.06em; margin-bottom: 8px"
+                    )
+                    for row in active:
+                        _render_shop_row(row, refresh_shop)
+
+                if bought:
+                    if active:
+                        ui.separator().classes("my-4")
+                    ui.label(f"ERLEDIGT  ({len(bought)})").style(
+                        "font-size: 0.72rem; font-weight: 700; color: #94a3b8; "
+                        "letter-spacing: 0.06em; margin-bottom: 8px"
+                    )
+                    for row in bought:
+                        _render_shop_row(row, refresh_shop)
+                    ui.button(
+                        f"Alle {len(bought)} Erledigten löschen",
+                        icon="cleaning_services",
+                        on_click=lambda: delete_bought_items(refresh_shop),
+                    ).classes("w-full mt-4").style(
+                        "background: #f1f5f9; color: #64748b; "
+                        "border-radius: 10px; font-weight: 600"
+                    )
+
+        # ── Event-Handler ────────────────────────────────────────────────────
+
+        def handle_post():
+            if not blog_content.value or not blog_content.value.strip():
+                ui.notify("Bitte einen Text eingeben", color="warning")
+                return
+            if not blog_author.value:
+                ui.notify("Bitte eine*n Absender*in wählen", color="warning")
+                return
+            add_post(blog_author.value, blog_content.value, blog_important.value, refresh_blog)
+            blog_content.value = ""
+            blog_important.value = False
+
+        def handle_add_item():
+            if not shop_name.value or not shop_name.value.strip():
+                ui.notify("Bitte einen Artikelnamen eingeben", color="warning")
+                return
+            add_shopping_item(
+                shop_name.value, shop_menge.value, shop_einheit.value,
+                shop_author.value, refresh_shop,
+            )
+            shop_name.value = ""
+            shop_menge.value = ""
+            shop_einheit.value = ""
+
+        refresh_blog()
+        refresh_shop()
+
+        # Einkaufsliste alle 2 s, Blog alle 5 s neu laden (Echtzeit-Sync)
+        _timers.append(ui.timer(2.0, refresh_shop))
+        _timers.append(ui.timer(5.0, refresh_blog))
+
+    _build()
+    return _build

@@ -14,10 +14,14 @@ def render_tasks_tab(container):
         session = get_session()
         tasks = session.query(Task).all()
         users = session.query(MitbewohnerDB).all()
-        # Datumswerte fuer die Kalender-Markierungen.
-        event_days = [task.created_at.strftime("%Y/%m/%d") for task in tasks if task.created_at]
+        # Nur Aufgaben mit Deadline im Kalender markieren.
+        event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date]
         open_tasks = [t for t in tasks if not t.is_done]
         done_tasks = [t for t in tasks if t.is_done]
+        tasks_with_deadline = sorted(
+            [t for t in tasks if t.due_date and not t.is_done],
+            key=lambda t: t.due_date,
+        )
 
         with container:
             # Hero-Banner
@@ -52,7 +56,7 @@ def render_tasks_tab(container):
                             )
                             ui.label("Erledigt").style("color: #f97316; font-size: 0.78rem; margin-top: 2px")
 
-            # Ämtli erstellen – Karte statt Expansion
+            # Ämtli erstellen – Karte
             with ui.card().classes("w-full mb-5").style(
                 "border-radius: 18px; box-shadow: 0 4px 20px rgba(249,115,22,0.10); "
                 "border: 1.5px solid #fed7aa; padding: 22px"
@@ -69,8 +73,20 @@ def render_tasks_tab(container):
                     label="Zuständige*r Mitbewohner*in",
                 ).classes("w-full mt-2")
 
+                # Deadline-Eingabe mit Datepicker-Popup
+                with ui.input("Deadline (optional)", placeholder="TT.MM.JJJJ") as deadline:
+                    with ui.menu().props("no-parent-event") as deadline_menu:
+                        with ui.date().props('mask="DD.MM.YYYY"').bind_value(deadline):
+                            with ui.row().classes("justify-end"):
+                                ui.button("OK", on_click=deadline_menu.close).props("flat dense")
+                    with deadline.add_slot("append"):
+                        ui.icon("calendar_month").classes("cursor-pointer").on(
+                            "click", deadline_menu.open
+                        )
+                deadline.classes("w-full mt-2")
+
                 def handle_task():
-                    save_task(title, who, refresh)
+                    save_task(title, who, deadline.value, refresh)
 
                 title.on("keydown.enter", handle_task)
                 ui.button("Ämtli erstellen", icon="add", on_click=handle_task).classes(
@@ -85,11 +101,45 @@ def render_tasks_tab(container):
                         ui.label("Ämtli-Kalender").style(
                             "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
                         )
-                        ui.label("Tage mit Aufgaben sind orange markiert").style(
+                        ui.label("Orange markierte Tage haben eine Deadline").style(
                             "font-size: 0.78rem; color: #94a3b8"
                         )
-                with ui.element("div").classes("px-4 pb-4"):
+                with ui.element("div").classes("px-4 pb-2"):
                     ui.date().props(f':events=\'{json.dumps(event_days)}\' event-color="orange"').classes("w-full")
+
+                # Deadline-Liste unterhalb des Kalenders
+                if tasks_with_deadline:
+                    with ui.element("div").classes("px-4 pb-4"):
+                        ui.separator().classes("my-2")
+                        with ui.row().classes("items-center gap-2 mb-2"):
+                            ui.icon("schedule").style("color: #f97316; font-size: 1rem")
+                            ui.label("Anstehende Deadlines").style(
+                                "font-size: 0.9rem; font-weight: 700; color: #9a3412"
+                            )
+                        for t in tasks_with_deadline:
+                            assigned = t.assigned_to.name if t.assigned_to else "–"
+                            deadline_str = t.due_date.strftime("%d.%m.%Y")
+                            with ui.row().classes("items-center gap-2 py-1 flex-wrap"):
+                                ui.icon("event").style(
+                                    "color: #f97316; font-size: 1rem; flex-shrink: 0"
+                                )
+                                ui.label(deadline_str).style(
+                                    "font-weight: 700; color: #9a3412; font-size: 0.85rem; "
+                                    "min-width: 80px"
+                                )
+                                ui.label("·").style("color: #fdba74")
+                                ui.label(assigned).style(
+                                    "font-weight: 600; color: #1e1b4b; font-size: 0.85rem"
+                                )
+                                ui.label("–").style("color: #94a3b8")
+                                ui.label(t.title).style(
+                                    "color: #374151; font-size: 0.85rem"
+                                )
+                else:
+                    with ui.element("div").classes("px-4 pb-4"):
+                        ui.label("Keine offenen Deadlines").style(
+                            "color: #94a3b8; font-size: 0.8rem; font-style: italic"
+                        )
 
             # Offene Aufgaben
             with ui.row().classes("items-center gap-2 mb-3"):
@@ -138,7 +188,10 @@ def render_tasks_tab(container):
                                 )
                                 ui.label(task.title).style(label_style)
                                 assigned_name = task.assigned_to.name if task.assigned_to else "Niemand"
-                                ui.label(f"Zuständig: {assigned_name}").style(
+                                meta_parts = [f"Zuständig: {assigned_name}"]
+                                if task.due_date:
+                                    meta_parts.append(f"Deadline: {task.due_date.strftime('%d.%m.%Y')}")
+                                ui.label("  ·  ".join(meta_parts)).style(
                                     "font-size: 0.78rem; color: #94a3b8; margin-top: 2px"
                                 )
                             status_text = "Erledigt" if is_done else "Offen"
