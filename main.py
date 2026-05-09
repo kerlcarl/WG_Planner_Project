@@ -7,7 +7,69 @@ from ui import render_collab_tab, render_finances_tab, render_tasks_tab, render_
 # Baut die Startseite mit Header, Tabs und den drei Inhaltsbereichen.
 @ui.page("/")
 def main_page():
-    ui.query("body").style("background-color: #f0f2f5")
+    ui.add_head_html("""
+<style>
+/* ── Hintergrundbild mit halbtransparentem Overlay ──────────────────── */
+body {
+  background-color: #eaecf5;
+  background-image:
+    linear-gradient(rgba(234, 236, 245, 0.80), rgba(234, 236, 245, 0.80)),
+    url('https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1920&q=80');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center center;
+}
+
+/* ── Tab-Panels transparent ─────────────────────────────────────────── */
+.q-tab-panels,
+.q-tab-panel {
+  background: transparent !important;
+}
+
+/* ── Tab-Leiste: Glassmorphismus ────────────────────────────────────── */
+.q-tabs {
+  background: rgba(255, 255, 255, 0.86) !important;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 2px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ── Karten ohne expliziten Hintergrund → Glassmorphismus ──────────── */
+.q-card:not([style*="background"]) {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+/* ── Weisse Karten semi-transparent ────────────────────────────────── */
+.q-card[style*="background: white"] {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Grüne (erledigte) Karten ──────────────────────────────────────── */
+.q-card[style*="background: #f0fdf4"] {
+  background: rgba(240, 253, 244, 0.84) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Rote (wichtige Blog-) Karten ──────────────────────────────────── */
+.q-card[style*="background: #fff5f5"] {
+  background: rgba(255, 245, 245, 0.84) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Graue (erledigte Einkaufs-) Karten ────────────────────────────── */
+.q-card[style*="background: #f8fafc"] {
+  background: rgba(248, 250, 252, 0.84) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+</style>
+""")
 
     ui.add_head_html("""
 <script>
@@ -152,9 +214,15 @@ def main_page():
 </script>
 """)
 
-    with ui.header().classes("bg-indigo-700 p-4 shadow-lg"):
+    with ui.header().classes("p-4").style(
+        "background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 80%, #6366f1 100%); "
+        "box-shadow: 0 4px 32px rgba(30, 27, 75, 0.40); "
+        "backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px)"
+    ):
         with ui.row().classes("w-full max-w-[1700px] mx-auto items-center px-2"):
-            ui.label("WG-Planner").classes("text-h4 text-white font-bold")
+            ui.label("WG-Planner").classes("text-h4 text-white font-bold").style(
+                "text-shadow: 0 2px 12px rgba(0,0,0,0.25); letter-spacing: -0.5px"
+            )
 
     with ui.tabs().classes("w-full bg-white shadow-sm") as tabs:
         users_tab = ui.tab("Mitbewohner*innen", icon="people")
