@@ -34,39 +34,33 @@ body {
   box-shadow: 0 2px 24px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* ── Karten ohne expliziten Hintergrund → Glassmorphismus ──────────── */
+/* ── Karten ohne expliziten Hintergrund → semi-transparent ─────────── */
+/* backdrop-filter wird bewusst weggelassen: Browser bricht den Blur-Effekt
+   ab sobald ein Vorfahre ein CSS-transform trägt (Tab-Animation, Drag-Nav).
+   Das führt dazu, dass man nur den Hintergrund sieht. Semi-transparente
+   Farbe ohne Blur ist zuverlässig und sieht trotzdem gut aus. */
 .q-card:not([style*="background"]) {
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  background: rgba(255, 255, 255, 0.88) !important;
 }
 
 /* ── Weisse Karten semi-transparent ────────────────────────────────── */
 .q-card[style*="background: white"] {
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.88) !important;
 }
 
 /* ── Grüne (erledigte) Karten ──────────────────────────────────────── */
 .q-card[style*="background: #f0fdf4"] {
-  background: rgba(240, 253, 244, 0.84) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(240, 253, 244, 0.90) !important;
 }
 
 /* ── Rote (wichtige Blog-) Karten ──────────────────────────────────── */
 .q-card[style*="background: #fff5f5"] {
-  background: rgba(255, 245, 245, 0.84) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 245, 245, 0.90) !important;
 }
 
 /* ── Graue (erledigte Einkaufs-) Karten ────────────────────────────── */
 .q-card[style*="background: #f8fafc"] {
-  background: rgba(248, 250, 252, 0.84) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(248, 250, 252, 0.90) !important;
 }
 </style>
 """)
@@ -231,7 +225,7 @@ body {
         collab_tab = ui.tab("Kollaborations-Hub", icon="groups")
 
     # Tab-Inhalte werden in eigenen Containern gerendert.
-    with ui.tab_panels(tabs, value=users_tab).classes("w-full max-w-[1700px] mx-auto bg-transparent p-4").props("animated"):
+    with ui.tab_panels(tabs, value=users_tab).classes("w-full max-w-[1700px] mx-auto bg-transparent p-4"):
         with ui.tab_panel(users_tab).classes("px-0"):
             users_container = ui.column().classes("w-full")
         with ui.tab_panel(finances_tab).classes("px-0"):
