@@ -5,3 +5,6 @@ __pycache__/
 
 # macOS metadata
 .DS_Store
+
+# SQLite-Datenbank (wird lokal generiert, nicht committen)
+*.db
