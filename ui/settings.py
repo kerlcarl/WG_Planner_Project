@@ -152,31 +152,35 @@ body {
                     label="Aktuelles Passwort", password=True, password_toggle_button=True,
                     on_change=lambda e: pw_vals.update(cur=e.value),
                 ).props("outlined dense").classes("w-full")
-                new_pw_err = _err()
-                new_pw = ui.input(
-                    label="Neues Passwort", password=True, password_toggle_button=True,
-                    on_change=lambda e: pw_vals.update(new=e.value),
-                ).props("outlined dense").classes("w-full")
-                new_pw2_err = _err()
-                new_pw2 = ui.input(
-                    label="Neues Passwort bestätigen", password=True, password_toggle_button=True,
-                    on_change=lambda e: pw_vals.update(new2=e.value),
-                ).props("outlined dense").classes("w-full")
-                pw_err = _err()
-                pw_ok = _success()
 
-                def _live_new(e):
+                new_pw_err = _err()
+
+                def _on_new_pw(e):
+                    pw_vals["new"] = e.value
                     err = validate_password(e.value) if e.value else None
                     new_pw_err.set_text(err or "")
 
-                def _live_new2(e):
+                new_pw = ui.input(
+                    label="Neues Passwort", password=True, password_toggle_button=True,
+                    on_change=_on_new_pw,
+                ).props("outlined dense").classes("w-full")
+
+                new_pw2_err = _err()
+
+                def _on_new_pw2(e):
+                    pw_vals["new2"] = e.value
                     if e.value and e.value != pw_vals["new"]:
                         new_pw2_err.set_text("Passwörter stimmen nicht überein")
                     else:
                         new_pw2_err.set_text("")
 
-                new_pw.on_change(_live_new)
-                new_pw2.on_change(_live_new2)
+                new_pw2 = ui.input(
+                    label="Neues Passwort bestätigen", password=True, password_toggle_button=True,
+                    on_change=_on_new_pw2,
+                ).props("outlined dense").classes("w-full")
+
+                pw_err = _err()
+                pw_ok = _success()
 
                 def save_pw():
                     pw_err.set_text("")
