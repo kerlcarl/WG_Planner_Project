@@ -149,29 +149,39 @@ def register_register_page():
                 email_in = _input("E-Mail", "email", "name@beispiel.ch")
                 email_err = _error_label()
 
-                pw_in = _input("Passwort", "password")
-                pw_err = _error_label()
+                # Passwörter per on_change tracken, da .value beim Button-Klick
+                # noch nicht übertragen sein muss (NiceGUI Timing-Problem).
+                pw_vals = {"pw": "", "pw2": ""}
 
-                pw2_in = _input("Passwort bestätigen", "password")
+                pw_err = _error_label()
+                pw_in = ui.input(
+                    label="Passwort", password=True, password_toggle_button=True,
+                    on_change=lambda e: pw_vals.update(pw=e.value),
+                ).props("outlined dense").classes("w-full")
+
                 pw2_err = _error_label()
+                pw2_in = ui.input(
+                    label="Passwort bestätigen", password=True, password_toggle_button=True,
+                    on_change=lambda e: pw_vals.update(pw2=e.value),
+                ).props("outlined dense").classes("w-full")
 
                 general_err = ui.label("").style(
                     "color: #dc2626; font-size: 0.85rem; background: #fef2f2; "
                     "border-radius: 8px; padding: 8px 12px; width: 100%; display: none"
                 )
 
-                def _live_pw(*_):
-                    err = validate_password(pw_in.value) if pw_in.value else None
+                def _live_pw(e):
+                    err = validate_password(e.value) if e.value else None
                     pw_err.set_text(err or "")
 
-                def _live_pw2(*_):
-                    if pw2_in.value and pw2_in.value != pw_in.value:
+                def _live_pw2(e):
+                    if e.value and e.value != pw_vals["pw"]:
                         pw2_err.set_text("Passwörter stimmen nicht überein")
                     else:
                         pw2_err.set_text("")
 
-                pw_in.on("update:model-value", _live_pw)
-                pw2_in.on("update:model-value", _live_pw2)
+                pw_in.on_change(_live_pw)
+                pw2_in.on_change(_live_pw2)
 
                 spinner = ui.spinner("dots", size="sm", color="indigo").style("display: none")
 
@@ -182,6 +192,9 @@ def register_register_page():
                     pw2_err.set_text("")
                     general_err.style("display: none")
 
+                    pw = pw_vals["pw"]
+                    pw2 = pw_vals["pw2"]
+
                     ok = True
                     if not first_in.value.strip() or not last_in.value.strip():
                         name_err.set_text("Vor- und Nachname sind Pflichtfelder")
@@ -189,18 +202,18 @@ def register_register_page():
                     if not email_in.value.strip():
                         email_err.set_text("Pflichtfeld")
                         ok = False
-                    pw_validation = validate_password(pw_in.value)
+                    pw_validation = validate_password(pw)
                     if pw_validation:
                         pw_err.set_text(pw_validation)
                         ok = False
-                    if pw_in.value != pw2_in.value:
+                    if pw != pw2:
                         pw2_err.set_text("Passwörter stimmen nicht überein")
                         ok = False
                     if not ok:
                         return
 
                     spinner.style("display: inline-block")
-                    user_id, err = register_user(first_in.value, last_in.value, email_in.value, pw_in.value)
+                    user_id, err = register_user(first_in.value, last_in.value, email_in.value, pw)
                     spinner.style("display: none")
 
                     if err:

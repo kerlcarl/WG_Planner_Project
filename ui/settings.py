@@ -146,41 +146,52 @@ body {
             with ui.card().style(_CARD_STYLE):
                 _section("Passwort ändern")
 
-                cur_pw = _input("Aktuelles Passwort", type_="password")
-                new_pw = _input("Neues Passwort", type_="password")
+                pw_vals = {"cur": "", "new": "", "new2": ""}
+
+                cur_pw = ui.input(
+                    label="Aktuelles Passwort", password=True, password_toggle_button=True,
+                    on_change=lambda e: pw_vals.update(cur=e.value),
+                ).props("outlined dense").classes("w-full")
                 new_pw_err = _err()
-                new_pw2 = _input("Neues Passwort bestätigen", type_="password")
+                new_pw = ui.input(
+                    label="Neues Passwort", password=True, password_toggle_button=True,
+                    on_change=lambda e: pw_vals.update(new=e.value),
+                ).props("outlined dense").classes("w-full")
                 new_pw2_err = _err()
+                new_pw2 = ui.input(
+                    label="Neues Passwort bestätigen", password=True, password_toggle_button=True,
+                    on_change=lambda e: pw_vals.update(new2=e.value),
+                ).props("outlined dense").classes("w-full")
                 pw_err = _err()
                 pw_ok = _success()
 
-                def _live_pw(*_):
-                    e = validate_password(new_pw.value) if new_pw.value else None
-                    new_pw_err.set_text(e or "")
+                def _live_new(e):
+                    err = validate_password(e.value) if e.value else None
+                    new_pw_err.set_text(err or "")
 
-                def _live_pw2(*_):
-                    if new_pw2.value and new_pw2.value != new_pw.value:
+                def _live_new2(e):
+                    if e.value and e.value != pw_vals["new"]:
                         new_pw2_err.set_text("Passwörter stimmen nicht überein")
                     else:
                         new_pw2_err.set_text("")
 
-                new_pw.on("update:model-value", _live_pw)
-                new_pw2.on("update:model-value", _live_pw2)
+                new_pw.on_change(_live_new)
+                new_pw2.on_change(_live_new2)
 
                 def save_pw():
                     pw_err.set_text("")
                     pw_ok.set_text("")
-                    if new_pw.value != new_pw2.value:
+                    new_pw2_err.set_text("")
+                    if pw_vals["new"] != pw_vals["new2"]:
                         new_pw2_err.set_text("Passwörter stimmen nicht überein")
                         return
-                    err = change_password(user_id, cur_pw.value, new_pw.value)
+                    err = change_password(user_id, pw_vals["cur"], pw_vals["new"])
                     if err:
                         pw_err.set_text(err)
                     else:
                         pw_ok.set_text("Passwort geändert ✓")
-                        cur_pw.value = ""
-                        new_pw.value = ""
-                        new_pw2.value = ""
+                        pw_vals.update(cur="", new="", new2="")
+                        cur_pw.value = new_pw.value = new_pw2.value = ""
                         ui.notify("Passwort erfolgreich geändert", color="positive")
 
                 ui.button("Passwort ändern", on_click=save_pw).props("no-caps unelevated").style(
