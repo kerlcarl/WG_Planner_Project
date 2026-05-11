@@ -32,8 +32,10 @@ def calculate_balances() -> dict[int, float]:
         # Anteil fuer jeden Teilnehmer abziehen, Gesamtbetrag beim Zahler gutschreiben.
         share = expense.calculate_share()
         for user in expense.participants:
-            balances[user.id] -= share
-        balances[expense.paid_by_id] += expense.amount
+            if user.id in balances:
+                balances[user.id] -= share
+        if expense.paid_by_id in balances:
+            balances[expense.paid_by_id] += expense.amount
 
     # Manuelle Schulden in die Kontostände einrechnen
     for debt in session.query(ManualDebt).all():
