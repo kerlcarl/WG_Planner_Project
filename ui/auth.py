@@ -107,8 +107,12 @@ def register_login_page():
                         return
 
                     spinner.style("display: inline-block")
-                    user_id = authenticate_user(email_in.value, pw_in.value)
-                    spinner.style("display: none")
+                    try:
+                        user_id = authenticate_user(email_in.value, pw_in.value)
+                    except Exception:
+                        user_id = None
+                    finally:
+                        spinner.style("display: none")
 
                     if user_id is None:
                         general_err.set_text("E-Mail oder Passwort falsch.")
@@ -212,8 +216,13 @@ def register_register_page():
                         return
 
                     spinner.style("display: inline-block")
-                    user_id, err = register_user(first_in.value, last_in.value, email_in.value, pw)
-                    spinner.style("display: none")
+                    try:
+                        user_id, err = register_user(first_in.value, last_in.value, email_in.value, pw)
+                    except Exception as ex:
+                        err = f"Fehler: {ex}"
+                        user_id = None
+                    finally:
+                        spinner.style("display: none")
 
                     if err:
                         general_err.set_text(err)

@@ -2,13 +2,17 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from passlib.context import CryptContext
+import bcrypt
 
 from models import MitbewohnerDB, Session
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-_PASSWORD_RE = re.compile(r'^(?=.*[A-Z])(?=.*\d).{8,}$')
+def _hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 def _get_session():
@@ -41,7 +45,7 @@ def register_user(first: str, last: str, email: str, password: str) -> tuple:
     user = MitbewohnerDB(
         name=f"{first.strip()} {last.strip()}",
         email=email,
-        password_hash=_pwd.hash(password),
+        password_hash=_hash(password),
     )
     session.add(user)
     session.commit()
@@ -59,7 +63,7 @@ def authenticate_user(email: str, password: str) -> int | None:
     if not user or not user.password_hash:
         session.close()
         return None
-    ok = _pwd.verify(password, user.password_hash)
+    ok = _verify(password, user.password_hash)
     user_id = user.id if ok else None
     session.close()
     return user_id
@@ -103,14 +107,14 @@ def change_password(user_id: int, current_pw: str, new_pw: str) -> str | None:
     if not user or not user.password_hash:
         session.close()
         return "Nutzer nicht gefunden."
-    if not _pwd.verify(current_pw, user.password_hash):
+    if not _verify(current_pw, user.password_hash):
         session.close()
         return "Aktuelles Passwort ist falsch."
     err = validate_password(new_pw)
     if err:
         session.close()
         return err
-    user.password_hash = _pwd.hash(new_pw)
+    user.password_hash = _hash(new_pw)
     session.commit()
     session.close()
     return None
@@ -147,7 +151,7 @@ def reset_password_with_token(token: str, new_pw: str) -> str | None:
     if err:
         session.close()
         return err
-    user.password_hash = _pwd.hash(new_pw)
+    user.password_hash = _hash(new_pw)
     user.reset_token = None
     user.reset_token_expires = None
     session.commit()
