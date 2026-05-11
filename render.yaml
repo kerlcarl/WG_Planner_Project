@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: wg-planner
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wg-planner-db
+          property: connectionString
+      - key: STORAGE_SECRET
+        generateValue: true
+
+databases:
+  - name: wg-planner-db
+    databaseName: wg_planner
+    user: wg_planner
+    region: frankfurt
+    plan: free

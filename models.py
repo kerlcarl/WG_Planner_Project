@@ -1,4 +1,5 @@
 # Datenmodelle und SQLAlchemy-Konfiguration fuer den WG-Planner.
+import os
 from datetime import datetime
 from typing import List
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, UniqueConstraint, create_engine, text
@@ -150,9 +151,14 @@ class Expense(Base):
 
 
 # --- Datenbank Initialisierung (Unit 6) ---
-DATABASE_URL = 'sqlite:///wg_planner.db'
-# SQLite-Engine; check_same_thread=False ist fuer UI-Threads noetig.
-engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///wg_planner.db')
+# Render liefert postgres://, SQLAlchemy braucht postgresql://
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+_is_sqlite = DATABASE_URL.startswith('sqlite')
+_connect_args = {'check_same_thread': False} if _is_sqlite else {}
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 # Session-Factory fuer DB-Zugriffe in services.py.
 Session = sessionmaker(bind=engine)
 
@@ -162,12 +168,14 @@ _SEED_USERS = ["Luca Martin", "Carl Klein"]
 def init_db():
     """Erstellt alle Tabellen basierend auf den Modellen."""
     Base.metadata.create_all(engine)
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN due_date DATETIME"))
-            conn.commit()
-        except Exception:
-            pass  # Spalte existiert bereits
+    # Migration nur fuer bestehende SQLite-DBs noetig; PostgreSQL bekommt das Schema frisch.
+    if _is_sqlite:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN due_date DATETIME"))
+                conn.commit()
+            except Exception:
+                pass  # Spalte existiert bereits
 
 
 def seed_db():
