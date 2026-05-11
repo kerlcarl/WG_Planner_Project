@@ -17,7 +17,13 @@ def _section(title: str):
 
 
 def _input(label: str, value: str = "", type_: str = "text") -> ui.input:
-    return ui.input(label=label, value=value).props(f"type={type_} outlined dense").classes("w-full")
+    is_pw = type_ == "password"
+    return ui.input(
+        label=label,
+        value=value,
+        password=is_pw,
+        password_toggle_button=is_pw,
+    ).props(f"type={type_} outlined dense" if not is_pw else "outlined dense").classes("w-full")
 
 
 def _err() -> ui.label:

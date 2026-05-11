@@ -37,9 +37,13 @@ def _sub_label(text: str):
 
 
 def _input(label: str, type_: str = "text", placeholder: str = "") -> ui.input:
-    i = ui.input(label=label, placeholder=placeholder).props(
-        f'type={type_} outlined dense'
-    ).classes("w-full")
+    is_pw = type_ == "password"
+    i = ui.input(
+        label=label,
+        placeholder=placeholder,
+        password=is_pw,
+        password_toggle_button=is_pw,
+    ).props(f'type={type_} outlined dense' if not is_pw else 'outlined dense').classes("w-full")
     return i
 
 
