@@ -3,7 +3,7 @@ from datetime import datetime
 
 from nicegui import ui
 
-from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Session, Task
+from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Reaction, Session, Task
 
 DEFAULT_EXPENSE_CATEGORIES = [
     "Lebensmittel",
@@ -301,6 +301,34 @@ def toggle_post_important(post_id, callback):
         session.commit()
     session.close()
     callback()
+
+
+# ── Reaktionen ────────────────────────────────────────────────────────────────
+
+def toggle_reaction(user_id: int, post_id: int, emoji: str) -> tuple[dict, list]:
+    session = get_session()
+    existing = session.query(Reaction).filter(
+        Reaction.user_id == user_id,
+        Reaction.post_id == post_id,
+        Reaction.emoji == emoji,
+    ).first()
+
+    if existing:
+        session.delete(existing)
+    else:
+        session.add(Reaction(user_id=user_id, post_id=post_id, emoji=emoji))
+
+    session.commit()
+
+    reactions_count: dict[str, int] = {}
+    user_reactions: list[str] = []
+    for r in session.query(Reaction).filter(Reaction.post_id == post_id).all():
+        reactions_count[r.emoji] = reactions_count.get(r.emoji, 0) + 1
+        if r.user_id == user_id:
+            user_reactions.append(r.emoji)
+
+    session.close()
+    return reactions_count, user_reactions
 
 
 # ── Einkaufsliste ──────────────────────────────────────────────────────────────

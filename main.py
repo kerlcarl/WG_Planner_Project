@@ -1,7 +1,20 @@
-from nicegui import ui
+from nicegui import app, ui
+from pydantic import BaseModel
 
 from models import init_db
 from ui import render_collab_tab, render_finances_tab, render_tasks_tab, render_users_tab
+
+
+class _ReactPayload(BaseModel):
+    emoji: str
+    user_id: int
+
+
+@app.post("/posts/{post_id}/react")
+async def _react_to_post(post_id: int, payload: _ReactPayload):
+    from services import toggle_reaction
+    reactions, user_reactions = toggle_reaction(payload.user_id, post_id, payload.emoji)
+    return {"reactions": reactions, "user_reactions": user_reactions}
 
 
 # Baut die Startseite mit Header, Tabs und den drei Inhaltsbereichen.
@@ -62,7 +75,62 @@ body {
 .q-card[style*="background: #f8fafc"] {
   background: rgba(248, 250, 252, 0.90) !important;
 }
+
+/* ── Reaktionsleiste ────────────────────────────────────────────────── */
+.rxbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rxbtn {
+  background: #f1f5f9;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  color: #64748b;
+  font-family: inherit;
+  line-height: 1.4;
+  user-select: none;
+}
+.rxbtn:hover { background: #e2e8f0; }
+.rxbtn.rx-active {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+  font-weight: 600;
+}
 </style>
+""")
+
+    ui.add_head_html("""
+<script>
+async function reactToPost(postId, emoji, userId) {
+  if (!userId) return;
+  try {
+    var resp = await fetch('/posts/' + postId + '/react', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({emoji: emoji, user_id: userId})
+    });
+    if (!resp.ok) return;
+    var data = await resp.json();
+    var bar = document.getElementById('rxbar-' + postId);
+    if (!bar) return;
+    bar.querySelectorAll('[data-emoji]').forEach(function(btn) {
+      var e = btn.getAttribute('data-emoji');
+      var countEl = btn.querySelector('.rxcount');
+      var count = data.reactions[e] || 0;
+      if (countEl) countEl.textContent = count > 0 ? ' ' + count : '';
+      if (data.user_reactions.indexOf(e) !== -1) {
+        btn.classList.add('rx-active');
+      } else {
+        btn.classList.remove('rx-active');
+      }
+    });
+  } catch(err) {
+    console.error('Reaction error:', err);
+  }
+}
+</script>
 """)
 
     ui.add_head_html("""

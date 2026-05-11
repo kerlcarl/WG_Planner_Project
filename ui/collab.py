@@ -2,7 +2,7 @@ from datetime import datetime
 
 from nicegui import ui
 
-from models import EinkaufsItem, MitbewohnerDB, Post
+from models import EinkaufsItem, MitbewohnerDB, Post, Reaction
 from services import (
     add_post,
     add_shopping_item,
@@ -167,10 +167,24 @@ def render_collab_tab(container):
         # innerhalb der offenen Session in Dicts kopiert, BEVOR sess.close()
         # aufgerufen wird. Sonst schlägt SQLAlchemy Lazy-Loading fehl.
 
+        _REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"]
+
         def refresh_blog():
             blog_feed.clear()
+            current_user_id = blog_author.value
             sess = get_session()
             posts = sess.query(Post).order_by(Post.created_at.desc()).all()
+            post_ids = [p.id for p in posts]
+
+            reactions_by_post: dict[int, dict[str, int]] = {}
+            user_rxns_by_post: dict[int, set[str]] = {}
+            if post_ids:
+                for r in sess.query(Reaction).filter(Reaction.post_id.in_(post_ids)).all():
+                    d = reactions_by_post.setdefault(r.post_id, {})
+                    d[r.emoji] = d.get(r.emoji, 0) + 1
+                    if r.user_id == current_user_id:
+                        user_rxns_by_post.setdefault(r.post_id, set()).add(r.emoji)
+
             # Daten materialisieren – Session muss noch offen sein
             rows = [
                 {
@@ -179,6 +193,8 @@ def render_collab_tab(container):
                     "is_important": p.is_important,
                     "created_at": p.created_at,
                     "author_name": p.author.name if p.author else "Unbekannt",
+                    "reactions": reactions_by_post.get(p.id, {}),
+                    "user_reactions": user_rxns_by_post.get(p.id, set()),
                 }
                 for p in posts
             ]
@@ -249,6 +265,20 @@ def render_collab_tab(container):
                                 "color: #374151; font-size: 0.88rem; margin-top: 10px; "
                                 "white-space: pre-wrap; word-break: break-word; line-height: 1.55"
                             )
+
+                            rxns = row["reactions"]
+                            user_rxns = row["user_reactions"]
+                            uid = current_user_id or 0
+                            btns = "".join(
+                                f'<button class="rxbtn{"  rx-active" if e in user_rxns else ""}" '
+                                f'data-emoji="{e}" '
+                                f'onclick="reactToPost({post_id}, \'{e}\', {uid})">'
+                                f'{e}<span class="rxcount">'
+                                f'{" " + str(rxns[e]) if e in rxns else ""}'
+                                f'</span></button>'
+                                for e in _REACTION_EMOJIS
+                            )
+                            ui.html(f'<div class="rxbar" id="rxbar-{post_id}">{btns}</div>')
 
         def _render_shop_row(row: dict, refresh_fn):
             """Rendert eine einzelne Einkaufslisten-Zeile aus einem Dict."""

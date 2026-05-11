@@ -1,7 +1,7 @@
 # Datenmodelle und SQLAlchemy-Konfiguration fuer den WG-Planner.
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, create_engine, text
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # Basis-Klasse für SQLAlchemy (Unit 6/7 Thema)
@@ -68,6 +68,24 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.now)
     author_id = Column(Integer, ForeignKey('users.id'))
     author = relationship("MitbewohnerDB", foreign_keys=[author_id])
+    reactions = relationship("Reaction", back_populates="post", cascade="all, delete-orphan")
+
+
+class Reaction(Base):
+    __tablename__ = 'reactions'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    post_id = Column(Integer, ForeignKey('posts.id'), nullable=False)
+    emoji = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship("MitbewohnerDB", foreign_keys=[user_id])
+    post = relationship("Post", foreign_keys=[post_id], back_populates="reactions")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'post_id', 'emoji', name='uq_reaction_user_post_emoji'),
+    )
 
 
 class EinkaufsItem(Base):
