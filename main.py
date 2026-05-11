@@ -3,8 +3,19 @@ import os
 from nicegui import app, ui
 from pydantic import BaseModel
 
+from auth_services import get_user_by_id
 from models import init_db, seed_db
-from ui import render_collab_tab, render_finances_tab, render_tasks_tab, render_users_tab
+from ui import (
+    register_forgot_password_page,
+    register_login_page,
+    register_register_page,
+    register_reset_password_page,
+    register_settings_page,
+    render_collab_tab,
+    render_finances_tab,
+    render_tasks_tab,
+    render_users_tab,
+)
 
 
 class _ReactPayload(BaseModel):
@@ -19,12 +30,8 @@ async def _react_to_post(post_id: int, payload: _ReactPayload):
     return {"reactions": reactions, "user_reactions": user_reactions}
 
 
-# Baut die Startseite mit Header, Tabs und den drei Inhaltsbereichen.
-@ui.page("/")
-def main_page():
-    ui.add_head_html("""
-<style>
-/* ── Hintergrundbild mit halbtransparentem Overlay ──────────────────── */
+def _page_style() -> str:
+    return """
 body {
   background-color: #eaecf5;
   background-image:
@@ -34,62 +41,53 @@ body {
   background-attachment: fixed;
   background-position: center center;
 }
-
-/* ── Tab-Panels transparent ─────────────────────────────────────────── */
-.q-tab-panels,
-.q-tab-panel {
-  background: transparent !important;
-}
-
-/* ── Tab-Leiste: Glassmorphismus ────────────────────────────────────── */
+.q-tab-panels, .q-tab-panel { background: transparent !important; }
 .q-tabs {
   background: rgba(255, 255, 255, 0.86) !important;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   box-shadow: 0 2px 24px rgba(0, 0, 0, 0.08) !important;
 }
-
-/* ── Karten ohne expliziten Hintergrund → semi-transparent ─────────── */
-/* backdrop-filter wird bewusst weggelassen: Browser bricht den Blur-Effekt
-   ab sobald ein Vorfahre ein CSS-transform trägt (Tab-Animation, Drag-Nav).
-   Das führt dazu, dass man nur den Hintergrund sieht. Semi-transparente
-   Farbe ohne Blur ist zuverlässig und sieht trotzdem gut aus. */
-.q-card:not([style*="background"]) {
-  background: rgba(255, 255, 255, 0.88) !important;
-}
-
-/* ── Weisse Karten semi-transparent ────────────────────────────────── */
-.q-card[style*="background: white"] {
-  background: rgba(255, 255, 255, 0.88) !important;
-}
-
-/* ── Grüne (erledigte) Karten ──────────────────────────────────────── */
-.q-card[style*="background: #f0fdf4"] {
-  background: rgba(240, 253, 244, 0.90) !important;
-}
-
-/* ── Rote (wichtige Blog-) Karten ──────────────────────────────────── */
-.q-card[style*="background: #fff5f5"] {
-  background: rgba(255, 245, 245, 0.90) !important;
-}
-
-/* ── Graue (erledigte Einkaufs-) Karten ────────────────────────────── */
-.q-card[style*="background: #f8fafc"] {
-  background: rgba(248, 250, 252, 0.90) !important;
-}
-
-/* ── Reaktions-Badge Pop-In ─────────────────────────────────────────── */
+.q-card:not([style*="background"]) { background: rgba(255, 255, 255, 0.88) !important; }
+.q-card[style*="background: white"] { background: rgba(255, 255, 255, 0.88) !important; }
+.q-card[style*="background: #f0fdf4"] { background: rgba(240, 253, 244, 0.90) !important; }
+.q-card[style*="background: #fff5f5"] { background: rgba(255, 245, 245, 0.90) !important; }
+.q-card[style*="background: #f8fafc"] { background: rgba(248, 250, 252, 0.90) !important; }
 @keyframes rx-badge-pop {
   0%   { transform: scale(0.45); opacity: 0; }
   60%  { transform: scale(1.18); opacity: 1; }
   80%  { transform: scale(0.94); }
   100% { transform: scale(1);    opacity: 1; }
 }
-.rx-badge-anim {
-  animation: rx-badge-pop 0.30s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-</style>
-""")
+.rx-badge-anim { animation: rx-badge-pop 0.30s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+"""
+
+
+def _avatar_html(user: dict, size: int = 38) -> str:
+    import os
+    if user.get("avatar_path") and os.path.exists(user["avatar_path"]):
+        return (
+            f'<img src="/{user["avatar_path"]}" '
+            f'style="width:{size}px;height:{size}px;border-radius:50%;object-fit:cover;cursor:pointer;" />'
+        )
+    initials = "".join(p[0].upper() for p in (user.get("name") or "?").split()[:2])
+    color = user.get("color") or "#4338ca"
+    return (
+        f'<div style="width:{size}px;height:{size}px;border-radius:50%;background:{color};'
+        f'display:flex;align-items:center;justify-content:center;'
+        f'color:white;font-weight:700;font-size:{size//3}px;cursor:pointer;">{initials}</div>'
+    )
+
+
+# Baut die Startseite mit Header, Tabs und den drei Inhaltsbereichen.
+@ui.page("/")
+def main_page():
+    user_id = app.storage.user.get("user_id")
+    if not user_id:
+        ui.navigate.to("/login")
+        return
+
+    ui.add_head_html(f"<style>{_page_style()}</style>")
 
     ui.add_head_html("""
 <script>
@@ -266,6 +264,8 @@ async function reactToPost(postId, emoji, userId) {
 </script>
 """)
 
+    current_user = get_user_by_id(user_id)
+
     with ui.header().classes("p-4").style(
         "background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 80%, #6366f1 100%); "
         "box-shadow: 0 4px 32px rgba(30, 27, 75, 0.40); "
@@ -275,6 +275,21 @@ async function reactToPost(postId, emoji, userId) {
             ui.label("WG-Planner").classes("text-h4 text-white font-bold").style(
                 "text-shadow: 0 2px 12px rgba(0,0,0,0.25); letter-spacing: -0.5px"
             )
+            ui.space()
+            with ui.element("div").style("position: relative"):
+                avatar = ui.html(_avatar_html(current_user or {"name": "?"}, 38))
+                with ui.menu().props("auto-close") as user_menu:
+                    if current_user:
+                        ui.label(current_user["name"]).style(
+                            "padding: 8px 16px; font-weight: 600; color: #312e81; font-size: 0.9rem"
+                        )
+                        ui.separator()
+                    ui.menu_item("Einstellungen", on_click=lambda: ui.navigate.to("/settings"))
+                    ui.menu_item(
+                        "Abmelden",
+                        on_click=lambda: (app.storage.user.pop("user_id", None), ui.navigate.to("/login")),
+                    )
+                avatar.on("click", user_menu.open)
 
     with ui.tabs().classes("w-full bg-white shadow-sm") as tabs:
         users_tab = ui.tab("Mitbewohner*innen", icon="people")
@@ -312,14 +327,21 @@ async function reactToPost(postId, emoji, userId) {
     tabs.on("update:model-value", _on_tab_change)
 
 
+# Register auth + settings pages (must be called at module level)
+register_login_page()
+register_register_page()
+register_forgot_password_page()
+register_reset_password_page()
+register_settings_page()
+
+
 if __name__ in {"__main__", "__mp_main__"}:
-    # Erst Datenbanktabellen sicherstellen, dann Webserver starten.
     init_db()
     seed_db()
     ui.run(
         title="WG-Planner",
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
-        storage_secret=os.environ.get("STORAGE_SECRET", "wg-planner-dev-secret-2024"),
+        storage_secret=os.environ.get("STORAGE_SECRET", "wg-planner-secret-key-2026"),
         show=False,
     )

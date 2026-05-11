@@ -28,7 +28,12 @@ class MitbewohnerDB(Base):
 
     id: int = Column(Integer, primary_key=True)
     name: str = Column(String, nullable=False)
-    color: str = Column(String, default='#336699') # Kennfarbe (Unit 9 NiceGUI)
+    color: str = Column(String, default='#336699')
+    email: str = Column(String, unique=True, nullable=True)
+    password_hash: str = Column(String, nullable=True)
+    avatar_path: str = Column(String, nullable=True)
+    reset_token: str = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     
     # Relationships (Unit 7)
     # Ein User hat viele Aufgaben und viele bezahlte Ausgaben
@@ -171,11 +176,19 @@ def init_db():
     # Migration nur fuer bestehende SQLite-DBs noetig; PostgreSQL bekommt das Schema frisch.
     if _is_sqlite:
         with engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE tasks ADD COLUMN due_date DATETIME"))
-                conn.commit()
-            except Exception:
-                pass  # Spalte existiert bereits
+            for stmt in [
+                "ALTER TABLE tasks ADD COLUMN due_date DATETIME",
+                "ALTER TABLE users ADD COLUMN email TEXT",
+                "ALTER TABLE users ADD COLUMN password_hash TEXT",
+                "ALTER TABLE users ADD COLUMN avatar_path TEXT",
+                "ALTER TABLE users ADD COLUMN reset_token TEXT",
+                "ALTER TABLE users ADD COLUMN reset_token_expires DATETIME",
+            ]:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    pass
 
 
 def seed_db():
