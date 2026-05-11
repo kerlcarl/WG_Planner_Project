@@ -3,3 +3,4 @@
 
 nicegui>=1.0.0
 SQLAlchemy>=1.4
+passlib[bcrypt]>=1.7
