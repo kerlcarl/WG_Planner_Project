@@ -1,3 +1,5 @@
+import os
+
 from nicegui import app, ui
 from pydantic import BaseModel
 
@@ -105,7 +107,7 @@ async function reactToPost(postId, emoji, userId) {
       var e = btn.getAttribute('data-emoji');
       var countEl = btn.querySelector('.rxcount');
       var count = data.reactions[e] || 0;
-      if (countEl) countEl.textContent = count > 0 ? ' ' + count : '';
+      if (countEl) countEl.textContent = count > 0 ? ' ' + count : '';
       if (data.user_reactions.indexOf(e) !== -1) {
         btn.classList.add('rx-active');
       } else {
@@ -336,4 +338,10 @@ register_settings_page()
 if __name__ in {"__main__", "__mp_main__"}:
     init_db()
     seed_db()
-    ui.run(title="WG-Planner", port=8080, show=False, storage_secret="wg-planner-secret-key-2026")
+    ui.run(
+        title="WG-Planner",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        storage_secret=os.environ.get("STORAGE_SECRET", "wg-planner-secret-key-2026"),
+        show=False,
+    )
