@@ -156,6 +156,9 @@ engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})
 # Session-Factory fuer DB-Zugriffe in services.py.
 Session = sessionmaker(bind=engine)
 
+_SEED_USERS = ["Luca Martin", "Carl Klein"]
+
+
 def init_db():
     """Erstellt alle Tabellen basierend auf den Modellen."""
     Base.metadata.create_all(engine)
@@ -165,3 +168,13 @@ def init_db():
             conn.commit()
         except Exception:
             pass  # Spalte existiert bereits
+
+
+def seed_db():
+    """Legt Standard-Mitbewohner an, falls die Tabelle noch leer ist."""
+    session = Session()
+    if session.query(MitbewohnerDB).count() == 0:
+        for name in _SEED_USERS:
+            session.add(MitbewohnerDB(name=name))
+        session.commit()
+    session.close()

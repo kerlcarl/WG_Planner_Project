@@ -1,7 +1,7 @@
 from nicegui import app, ui
 from pydantic import BaseModel
 
-from models import init_db
+from models import init_db, seed_db
 from ui import render_collab_tab, render_finances_tab, render_tasks_tab, render_users_tab
 
 
@@ -313,4 +313,5 @@ async function reactToPost(postId, emoji, userId) {
 if __name__ in {"__main__", "__mp_main__"}:
     # Erst Datenbanktabellen sicherstellen, dann Webserver starten.
     init_db()
+    seed_db()
     ui.run(title="WG-Planner", port=8080, show=False)
