@@ -11,6 +11,7 @@ from services import (
     delete_shopping_item,
     get_session,
     toggle_post_important,
+    toggle_reaction,
     toggle_shopping_item,
 )
 
@@ -169,6 +170,13 @@ def render_collab_tab(container):
 
         _REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"]
 
+        def _react(post_id: int, emoji: str):
+            if not blog_author.value:
+                ui.notify("Bitte wähle zuerst, wer du bist", color="warning")
+                return
+            toggle_reaction(blog_author.value, post_id, emoji)
+            refresh_blog()
+
         def refresh_blog():
             blog_feed.clear()
             current_user_id = blog_author.value
@@ -176,16 +184,16 @@ def render_collab_tab(container):
             posts = sess.query(Post).order_by(Post.created_at.desc()).all()
             post_ids = [p.id for p in posts]
 
-            reactions_by_post: dict[int, dict[str, int]] = {}
-            user_rxns_by_post: dict[int, set[str]] = {}
+            # Pro Post: Reaktoren pro Emoji (Namen) + eigene Reaktion des aktuellen Users
+            reactor_names: dict[int, dict[str, list[str]]] = {}
+            user_emoji_by_post: dict[int, str] = {}
             if post_ids:
                 for r in sess.query(Reaction).filter(Reaction.post_id.in_(post_ids)).all():
-                    d = reactions_by_post.setdefault(r.post_id, {})
-                    d[r.emoji] = d.get(r.emoji, 0) + 1
+                    name = users_dict.get(r.user_id, "?")
+                    reactor_names.setdefault(r.post_id, {}).setdefault(r.emoji, []).append(name)
                     if r.user_id == current_user_id:
-                        user_rxns_by_post.setdefault(r.post_id, set()).add(r.emoji)
+                        user_emoji_by_post[r.post_id] = r.emoji
 
-            # Daten materialisieren – Session muss noch offen sein
             rows = [
                 {
                     "id": p.id,
@@ -193,8 +201,8 @@ def render_collab_tab(container):
                     "is_important": p.is_important,
                     "created_at": p.created_at,
                     "author_name": p.author.name if p.author else "Unbekannt",
-                    "reactions": reactions_by_post.get(p.id, {}),
-                    "user_reactions": user_rxns_by_post.get(p.id, set()),
+                    "reactor_names": reactor_names.get(p.id, {}),
+                    "my_emoji": user_emoji_by_post.get(p.id),
                 }
                 for p in posts
             ]
@@ -221,6 +229,8 @@ def render_collab_tab(container):
                     ts = row["created_at"].strftime("%d.%m.%Y · %H:%M") if row["created_at"] else ""
                     post_id = row["id"]
                     color = _blog_color(author_name)
+                    rxn_names = row["reactor_names"]   # emoji → [name, ...]
+                    my_emoji = row["my_emoji"]          # str oder None
 
                     with ui.card().classes("w-full mb-3").style(
                         ("border-radius: 14px; border-left: 5px solid #dc2626; background: #fff5f5; "
@@ -261,24 +271,54 @@ def render_collab_tab(container):
                                         icon="delete",
                                         on_click=lambda pid=post_id: delete_post(pid, refresh_blog),
                                     ).props("flat round dense").style("color: #ef4444")
+
                             ui.label(row["content"]).style(
                                 "color: #374151; font-size: 0.88rem; margin-top: 10px; "
                                 "white-space: pre-wrap; word-break: break-word; line-height: 1.55"
                             )
 
-                            rxns = row["reactions"]
-                            user_rxns = row["user_reactions"]
-                            uid = current_user_id or 0
-                            btns = "".join(
-                                f'<button class="rxbtn{"  rx-active" if e in user_rxns else ""}" '
-                                f'data-emoji="{e}" '
-                                f'onclick="reactToPost({post_id}, \'{e}\', {uid})">'
-                                f'{e}<span class="rxcount">'
-                                f'{" " + str(rxns[e]) if e in rxns else ""}'
-                                f'</span></button>'
-                                for e in _REACTION_EMOJIS
-                            )
-                            ui.html(f'<div class="rxbar" id="rxbar-{post_id}">{btns}</div>')
+                            # ── Reaktions-Badges (mit Pop-In-Animation) ─────────
+                            active_rxns = {e: names for e, names in rxn_names.items() if names}
+                            if active_rxns:
+                                with ui.row().classes("flex-wrap gap-2").style("margin-top: 10px"):
+                                    for emoji, names in active_rxns.items():
+                                        is_mine = (my_emoji == emoji)
+                                        badge = ui.element("div").classes("rx-badge-anim").style(
+                                            "display: inline-flex; align-items: center; gap: 5px; "
+                                            "border-radius: 999px; padding: 4px 12px; "
+                                            "font-size: 0.88rem; cursor: default; user-select: none; "
+                                            + (
+                                                "background: #ede9fe; border: 1.5px solid #c4b5fd; "
+                                                "color: #7c3aed; font-weight: 700;"
+                                                if is_mine else
+                                                "background: #f1f5f9; border: 1.5px solid #e2e8f0; "
+                                                "color: #475569;"
+                                            )
+                                        )
+                                        with badge:
+                                            ui.label(f"{emoji}  {len(names)}").style(
+                                                "line-height: 1.4; font-size: 0.88rem"
+                                            )
+                                        badge.tooltip(", ".join(names))
+
+                            # ── Emoji-Picker (1 Emoji pro User wählbar) ─────────
+                            with ui.row().classes("flex-wrap gap-1").style("margin-top: 8px"):
+                                for emoji in _REACTION_EMOJIS:
+                                    is_mine = (my_emoji == emoji)
+                                    ui.button(
+                                        emoji,
+                                        on_click=lambda pid=post_id, e=emoji: _react(pid, e),
+                                    ).props("flat dense no-caps").style(
+                                        "border-radius: 999px; padding: 1px 8px; font-size: 0.9rem; "
+                                        "min-width: unset; transition: all 0.15s ease; "
+                                        + (
+                                            "background: #ede9fe; border: 1.5px solid #c4b5fd; "
+                                            "color: #7c3aed; opacity: 1;"
+                                            if is_mine else
+                                            "background: transparent; border: 1.5px solid #e8e8e8; "
+                                            "color: #94a3b8; opacity: 0.8;"
+                                        )
+                                    )
 
         def _render_shop_row(row: dict, refresh_fn):
             """Rendert eine einzelne Einkaufslisten-Zeile aus einem Dict."""

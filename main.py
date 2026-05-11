@@ -76,27 +76,15 @@ body {
   background: rgba(248, 250, 252, 0.90) !important;
 }
 
-/* ── Reaktionsleiste ────────────────────────────────────────────────── */
-.rxbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.rxbtn {
-  background: #f1f5f9;
-  border: 1.5px solid transparent;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  color: #64748b;
-  font-family: inherit;
-  line-height: 1.4;
-  user-select: none;
+/* ── Reaktions-Badge Pop-In ─────────────────────────────────────────── */
+@keyframes rx-badge-pop {
+  0%   { transform: scale(0.45); opacity: 0; }
+  60%  { transform: scale(1.18); opacity: 1; }
+  80%  { transform: scale(0.94); }
+  100% { transform: scale(1);    opacity: 1; }
 }
-.rxbtn:hover { background: #e2e8f0; }
-.rxbtn.rx-active {
-  background: #ede9fe;
-  border-color: #c4b5fd;
-  color: #7c3aed;
-  font-weight: 600;
+.rx-badge-anim {
+  animation: rx-badge-pop 0.30s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 </style>
 """)

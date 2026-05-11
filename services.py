@@ -307,14 +307,20 @@ def toggle_post_important(post_id, callback):
 
 def toggle_reaction(user_id: int, post_id: int, emoji: str) -> tuple[dict, list]:
     session = get_session()
+
+    # Pro User darf nur eine Reaktion pro Post existieren
     existing = session.query(Reaction).filter(
         Reaction.user_id == user_id,
         Reaction.post_id == post_id,
-        Reaction.emoji == emoji,
     ).first()
 
     if existing:
-        session.delete(existing)
+        if existing.emoji == emoji:
+            # Gleicher Emoji → entfernen (toggle off)
+            session.delete(existing)
+        else:
+            # Anderer Emoji → ersetzen
+            existing.emoji = emoji
     else:
         session.add(Reaction(user_id=user_id, post_id=post_id, emoji=emoji))
 
