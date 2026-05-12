@@ -309,8 +309,8 @@ async function reactToPost(postId, emoji, userId) {
             collab_container = ui.column().classes("w-full")
 
     # Renderer liefern Refresh-Funktionen zurueck, damit Daten neu geladen werden koennen.
-    finances_refresh = render_finances_tab(finances_container)
-    tasks_refresh = render_tasks_tab(tasks_container)
+    finances_refresh = render_finances_tab(finances_container, user_id)
+    tasks_refresh = render_tasks_tab(tasks_container, user_id)
     collab_refresh = render_collab_tab(collab_container, user_id)
     render_users_tab(
         users_container,

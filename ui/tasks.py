@@ -7,7 +7,7 @@ from services import get_session, save_task, update_task_status
 
 
 # Rendert den Aufgaben-Tab und liefert eine Refresh-Funktion zurueck.
-def render_tasks_tab(container):
+def render_tasks_tab(container, current_user_id: int = None):
     # Baut den kompletten Tab aus aktuellen DB-Daten neu auf.
     def refresh():
         container.clear()
@@ -71,6 +71,7 @@ def render_tasks_tab(container):
                 who = ui.select(
                     {user.id: user.name for user in users},
                     label="Zuständige*r Mitbewohner*in",
+                    value=current_user_id,
                 ).classes("w-full mt-2")
 
                 # Deadline-Eingabe mit Datepicker-Popup

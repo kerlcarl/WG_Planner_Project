@@ -17,7 +17,7 @@ _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
 
 
 # Rendert den Finanz-Tab und liefert eine Refresh-Funktion fuer Neuaufbau.
-def render_finances_tab(container):
+def render_finances_tab(container, current_user_id: int = None):
     # Liest aktuelle Daten, berechnet Kennzahlen und baut alle UI-Karten neu.
     def refresh():
         container.clear()
@@ -110,7 +110,7 @@ def render_finances_tab(container):
                     ):
                         with ui.column().classes("w-full gap-3 p-4"):
                             ui.label("Bezahlt von").classes("text-sm font-medium text-slate-700")
-                            payer = ui.radio({user.id: user.name for user in users}).classes("w-full")
+                            payer = ui.radio({user.id: user.name for user in users}, value=current_user_id).classes("w-full")
 
                     with ui.card().classes(
                         "w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"
@@ -362,6 +362,7 @@ def render_finances_tab(container):
                             man_from = ui.select(
                                 {u.id: u.name for u in users},
                                 label="Wer bezahlt?",
+                                value=current_user_id,
                             ).classes("w-full")
                             man_to = ui.select(
                                 {u.id: u.name for u in users},
