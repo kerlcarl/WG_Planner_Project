@@ -25,7 +25,7 @@ def _blog_color(name: str) -> str:
     return _BLOG_PALETTE[sum(ord(c) for c in name) % len(_BLOG_PALETTE)]
 
 
-def render_collab_tab(container):
+def render_collab_tab(container, current_user_id: int):
     _timers: list = []
 
     def _build():
@@ -37,7 +37,6 @@ def render_collab_tab(container):
         sess = get_session()
         users = sess.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
         users_dict = {u.id: u.name for u in users}
-        first_id = users[0].id if users else None
         sess.close()
 
         with container:
@@ -90,9 +89,6 @@ def render_collab_tab(container):
                         "font-weight: 700; color: #4c1d95; font-size: 0.95rem"
                     )
 
-                blog_author = ui.select(
-                    users_dict, value=first_id, label="Absender*in"
-                ).classes("w-full")
                 blog_content = ui.textarea(
                     "Inhalt", placeholder="Was möchtest du der WG mitteilen?"
                 ).classes("w-full mt-2").props("rows=3 outlined")
@@ -148,10 +144,6 @@ def render_collab_tab(container):
                 with ui.row().classes("w-full gap-2 mt-2"):
                     shop_menge = ui.input("Menge", placeholder="z. B. 2").classes("flex-1")
                     shop_einheit = ui.input("Einheit", placeholder="z. B. Liter").classes("flex-1")
-                shop_author = ui.select(
-                    users_dict, value=first_id, label="Hinzugefügt von"
-                ).classes("w-full mt-2")
-
                 shop_name.on("keydown.enter", lambda: handle_add_item())
                 ui.button(
                     "Hinzufügen", icon="add",
@@ -171,15 +163,11 @@ def render_collab_tab(container):
         _REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"]
 
         def _react(post_id: int, emoji: str):
-            if not blog_author.value:
-                ui.notify("Bitte wähle zuerst, wer du bist", color="warning")
-                return
-            toggle_reaction(blog_author.value, post_id, emoji)
+            toggle_reaction(current_user_id, post_id, emoji)
             refresh_blog()
 
         def refresh_blog():
             blog_feed.clear()
-            current_user_id = blog_author.value
             sess = get_session()
             posts = sess.query(Post).order_by(Post.created_at.desc()).all()
             post_ids = [p.id for p in posts]
@@ -426,10 +414,7 @@ def render_collab_tab(container):
             if not blog_content.value or not blog_content.value.strip():
                 ui.notify("Bitte einen Text eingeben", color="warning")
                 return
-            if not blog_author.value:
-                ui.notify("Bitte eine*n Absender*in wählen", color="warning")
-                return
-            add_post(blog_author.value, blog_content.value, blog_important.value, refresh_blog)
+            add_post(current_user_id, blog_content.value, blog_important.value, refresh_blog)
             blog_content.value = ""
             blog_important.value = False
 
@@ -439,7 +424,7 @@ def render_collab_tab(container):
                 return
             add_shopping_item(
                 shop_name.value, shop_menge.value, shop_einheit.value,
-                shop_author.value, refresh_shop,
+                current_user_id, refresh_shop,
             )
             shop_name.value = ""
             shop_menge.value = ""
