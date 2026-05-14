@@ -87,7 +87,12 @@ def render_tasks_tab(container, current_user_id: int = None):
                 deadline.classes("w-full mt-2")
 
                 def handle_task():
-                    save_task(title, who, deadline.value, refresh)
+                    err = save_task(title.value, who.value, deadline.value)
+                    if err:
+                        ui.notify(err, color="warning")
+                        return
+                    ui.notify("Neues Ämtli erstellt", color="positive")
+                    refresh()
 
                 title.on("keydown.enter", handle_task)
                 ui.button("Ämtli erstellen", icon="add", on_click=handle_task).classes(
@@ -179,7 +184,9 @@ def render_tasks_tab(container, current_user_id: int = None):
                         with ui.row().classes("w-full items-center p-3 gap-3"):
                             ui.checkbox(
                                 value=is_done,
-                                on_change=lambda event, t=task: update_task_status(t, event.value, refresh),
+                                on_change=lambda event, t=task: (
+                                    update_task_status(t.id, event.value), refresh()
+                                ),
                             ).style("flex-shrink: 0")
                             with ui.column().classes("flex-grow gap-0"):
                                 label_style = (

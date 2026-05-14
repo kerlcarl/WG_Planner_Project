@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, UniqueConstraint, create_engine, text
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Table, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # Basis-Klasse für SQLAlchemy (Unit 6/7 Thema)
@@ -170,25 +170,31 @@ Session = sessionmaker(bind=engine)
 _SEED_USERS = ["Luca Martin", "Carl Klein"]
 
 
+def _migrate_sqlite() -> None:
+    """Ergänzt fehlende Spalten in bestehenden SQLite-Datenbanken via ORM-Inspektion."""
+    inspector = inspect(engine)
+    pending: list[tuple[str, str, str]] = [
+        ('tasks', 'due_date', 'DATETIME'),
+        ('users', 'email', 'TEXT'),
+        ('users', 'password_hash', 'TEXT'),
+        ('users', 'avatar_path', 'TEXT'),
+        ('users', 'reset_token', 'TEXT'),
+        ('users', 'reset_token_expires', 'DATETIME'),
+    ]
+    with engine.connect() as conn:
+        for table, col, col_type in pending:
+            existing = {c['name'] for c in inspector.get_columns(table)}
+            if col not in existing:
+                conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {col_type}'))
+        conn.commit()
+
+
 def init_db():
     """Erstellt alle Tabellen basierend auf den Modellen."""
     Base.metadata.create_all(engine)
     # Migration nur fuer bestehende SQLite-DBs noetig; PostgreSQL bekommt das Schema frisch.
     if _is_sqlite:
-        with engine.connect() as conn:
-            for stmt in [
-                "ALTER TABLE tasks ADD COLUMN due_date DATETIME",
-                "ALTER TABLE users ADD COLUMN email TEXT",
-                "ALTER TABLE users ADD COLUMN password_hash TEXT",
-                "ALTER TABLE users ADD COLUMN avatar_path TEXT",
-                "ALTER TABLE users ADD COLUMN reset_token TEXT",
-                "ALTER TABLE users ADD COLUMN reset_token_expires DATETIME",
-            ]:
-                try:
-                    conn.execute(text(stmt))
-                    conn.commit()
-                except Exception:
-                    pass
+        _migrate_sqlite()
 
 
 def seed_db():

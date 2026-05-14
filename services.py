@@ -1,7 +1,5 @@
-# Gemeinsame Anwendungslogik und CRUD-Funktionen fuer die UI.
+# Anwendungslogik und CRUD-Funktionen – vollständig frei von UI-Abhängigkeiten.
 from datetime import datetime
-
-from nicegui import ui
 
 from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Reaction, Session, Task
 
@@ -17,379 +15,291 @@ DEFAULT_EXPENSE_CATEGORIES = [
 ]
 
 
-# Liefert fuer jeden Aufruf eine frische SQLAlchemy-Session.
 def get_session():
     return Session()
 
 
-# Berechnet den Kontostand pro Benutzer aus allen Ausgaben.
+# ── Finanzen ───────────────────────────────────────────────────────────────────
+
 def calculate_balances() -> dict[int, float]:
-    session = get_session()
-    users = session.query(MitbewohnerDB).all()
-    balances = {user.id: 0.0 for user in users}
+    with get_session() as session:
+        users = session.query(MitbewohnerDB).all()
+        balances = {user.id: 0.0 for user in users}
 
-    for expense in session.query(Expense).all():
-        # Anteil fuer jeden Teilnehmer abziehen, Gesamtbetrag beim Zahler gutschreiben.
-        share = expense.calculate_share()
-        for user in expense.participants:
-            if user.id in balances:
-                balances[user.id] -= share
-        if expense.paid_by_id in balances:
-            balances[expense.paid_by_id] += expense.amount
+        for expense in session.query(Expense).all():
+            share = expense.calculate_share()
+            for user in expense.participants:
+                if user.id in balances:
+                    balances[user.id] -= share
+            if expense.paid_by_id in balances:
+                balances[expense.paid_by_id] += expense.amount
 
-    # Manuelle Schulden in die Kontostände einrechnen
-    for debt in session.query(ManualDebt).all():
-        if debt.from_user_id in balances:
-            balances[debt.from_user_id] -= debt.amount
-        if debt.to_user_id in balances:
-            balances[debt.to_user_id] += debt.amount
+        for debt in session.query(ManualDebt).all():
+            if debt.from_user_id in balances:
+                balances[debt.from_user_id] -= debt.amount
+            if debt.to_user_id in balances:
+                balances[debt.to_user_id] += debt.amount
 
-    session.close()
     return balances
 
 
-# Erstellt konkrete Ausgleichszahlungen aus den berechneten Salden.
 def calculate_settlements() -> list[dict[str, float | int]]:
     balances = calculate_balances()
     settlements: list[dict[str, float | int]] = []
 
     creditors = [
-        {"user_id": user_id, "amount": round(amount, 2)}
-        for user_id, amount in balances.items()
-        if amount > 0.01
+        {"user_id": uid, "amount": round(amt, 2)}
+        for uid, amt in balances.items()
+        if amt > 0.01
     ]
     debtors = [
-        {"user_id": user_id, "amount": round(-amount, 2)}
-        for user_id, amount in balances.items()
-        if amount < -0.01
+        {"user_id": uid, "amount": round(-amt, 2)}
+        for uid, amt in balances.items()
+        if amt < -0.01
     ]
 
-    creditor_index = 0
-    debtor_index = 0
-
-    while creditor_index < len(creditors) and debtor_index < len(debtors):
-        creditor = creditors[creditor_index]
-        debtor = debtors[debtor_index]
-        transfer_amount = round(min(creditor["amount"], debtor["amount"]), 2)
-
-        # Nur sinnvolle (nicht triviale) Transfers speichern.
-        if transfer_amount > 0.01:
-            settlements.append(
-                {
-                    "from_user_id": debtor["user_id"],
-                    "to_user_id": creditor["user_id"],
-                    "amount": transfer_amount,
-                }
-            )
-
-        creditor["amount"] = round(creditor["amount"] - transfer_amount, 2)
-        debtor["amount"] = round(debtor["amount"] - transfer_amount, 2)
-
+    ci = di = 0
+    while ci < len(creditors) and di < len(debtors):
+        creditor, debtor = creditors[ci], debtors[di]
+        transfer = round(min(creditor["amount"], debtor["amount"]), 2)
+        if transfer > 0.01:
+            settlements.append({
+                "from_user_id": debtor["user_id"],
+                "to_user_id": creditor["user_id"],
+                "amount": transfer,
+            })
+        creditor["amount"] = round(creditor["amount"] - transfer, 2)
+        debtor["amount"] = round(debtor["amount"] - transfer, 2)
         if creditor["amount"] <= 0.01:
-            creditor_index += 1
+            ci += 1
         if debtor["amount"] <= 0.01:
-            debtor_index += 1
+            di += 1
 
     return settlements
 
 
-# Summiert Ausgaben je Kategorie fuer die Statistik-Kacheln.
 def calculate_category_totals() -> list[dict[str, float]]:
-    session = get_session()
-    totals: dict[str, float] = {}
-
-    for expense in session.query(Expense).all():
-        category = expense.category or "Sonstiges"
-        totals[category] = totals.get(category, 0.0) + expense.amount
-
-    session.close()
+    with get_session() as session:
+        totals: dict[str, float] = {}
+        for expense in session.query(Expense).all():
+            category = expense.category or "Sonstiges"
+            totals[category] = totals.get(category, 0.0) + expense.amount
 
     return [
-        {"category": category, "amount": round(amount, 2)}
-        for category, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+        {"category": cat, "amount": round(amt, 2)}
+        for cat, amt in sorted(totals.items(), key=lambda item: item[1], reverse=True)
     ]
 
 
-# Legt einen neuen Benutzer an und informiert die UI.
-def add_user(input_field, callback):
-    session = get_session()
-    session.add(MitbewohnerDB(name=input_field.value.strip()))
-    session.commit()
-    session.close()
-    input_field.value = ""
-    ui.notify("Mitbewohner*in hinzugefuegt", color="positive")
-    callback()
-
-
-# Legt eine neue Ausgabe mit Teilnehmern an.
-def save_expense(desc, amt, cat, payer, parts, callback):
-    if not desc.value or not amt.value or not payer.value or not cat.value:
-        ui.notify("Bitte alle Pflichtfelder ausfuellen", color="warning")
-        return
-
-    session = get_session()
-    expense = Expense(
-        description=desc.value,
-        amount=amt.value,
-        category=cat.value,
-        paid_by_id=payer.value,
-    )
-
-    if parts.value:
-        # Viele-zu-viele Verknuepfung ueber expense.participants.
-        for participant_id in parts.value:
-            user = session.get(MitbewohnerDB, participant_id)
+def save_expense(desc: str, amt: float, cat: str, payer_id: int, participant_ids: list[int]) -> None:
+    with get_session() as session:
+        expense = Expense(description=desc, amount=amt, category=cat, paid_by_id=payer_id)
+        for uid in participant_ids:
+            user = session.get(MitbewohnerDB, uid)
             if user:
                 expense.participants.append(user)
-
-    session.add(expense)
-    session.commit()
-    session.close()
-    ui.notify("Ausgabe erfolgreich gespeichert", color="positive")
-    callback()
-
-
-# Entfernt eine Ausgabe dauerhaft aus der Datenbank.
-def delete_expense(expense, callback):
-    session = get_session()
-    expense_to_delete = session.get(Expense, expense.id)
-    if expense_to_delete:
-        session.delete(expense_to_delete)
+        session.add(expense)
         session.commit()
-    session.close()
-    ui.notify("Ausgabe geloescht", color="negative")
-    callback()
 
 
-def create_manual_debt(from_id, to_id, amount, method, description, callback):
-    session = get_session()
-    desc = description.strip() if description.strip() else f"Offene Rechnung via {method}"
-
-    existing = session.query(ManualDebt).filter(
-        ManualDebt.from_user_id == from_id,
-        ManualDebt.to_user_id == to_id,
-    ).first()
-
-    if existing:
-        existing.amount = round(existing.amount + amount, 2)
-        if desc:
-            existing.description = (
-                f"{existing.description}, {desc}" if existing.description else desc
-            )
-        existing.payment_method = method
-        msg = f"Rechnung aktualisiert – neu CHF {existing.amount:.2f}"
-    else:
-        session.add(ManualDebt(
-            description=desc,
-            amount=amount,
-            payment_method=method,
-            from_user_id=from_id,
-            to_user_id=to_id,
-        ))
-        msg = "Offene Rechnung erfasst"
-
-    session.commit()
-    session.close()
-    ui.notify(msg, color="positive")
-    callback()
+def delete_expense(expense_id: int) -> None:
+    with get_session() as session:
+        expense = session.get(Expense, expense_id)
+        if expense:
+            session.delete(expense)
+            session.commit()
 
 
-def delete_manual_debt(debt_id, callback):
-    session = get_session()
-    debt = session.get(ManualDebt, debt_id)
-    if debt:
-        session.delete(debt)
+def create_manual_debt(from_id: int, to_id: int, amount: float, method: str, description: str) -> str:
+    """Legt eine manuelle Schuld an oder aktualisiert eine bestehende. Gibt eine Bestätigungsmeldung zurück."""
+    with get_session() as session:
+        desc = description.strip() if description.strip() else f"Offene Rechnung via {method}"
+        existing = session.query(ManualDebt).filter(
+            ManualDebt.from_user_id == from_id,
+            ManualDebt.to_user_id == to_id,
+        ).first()
+        if existing:
+            existing.amount = round(existing.amount + amount, 2)
+            if desc:
+                existing.description = (
+                    f"{existing.description}, {desc}" if existing.description else desc
+                )
+            existing.payment_method = method
+            msg = f"Rechnung aktualisiert – neu CHF {existing.amount:.2f}"
+        else:
+            session.add(ManualDebt(
+                description=desc, amount=amount, payment_method=method,
+                from_user_id=from_id, to_user_id=to_id,
+            ))
+            msg = "Offene Rechnung erfasst"
         session.commit()
-    session.close()
-    ui.notify("Ausgleich als bezahlt markiert", color="positive")
-    callback()
+    return msg
 
 
-def delete_manual_debts_by_pair(from_id: int, to_id: int, callback) -> None:
-    """Löscht alle offenen Schulden zwischen zwei Personen auf einmal."""
-    session = get_session()
-    session.query(ManualDebt).filter(
-        ManualDebt.from_user_id == from_id,
-        ManualDebt.to_user_id == to_id,
-    ).delete()
-    session.commit()
-    session.close()
-    ui.notify("Ausgleich als bezahlt markiert", color="positive")
-    callback()
+def delete_manual_debt(debt_id: int) -> None:
+    with get_session() as session:
+        debt = session.get(ManualDebt, debt_id)
+        if debt:
+            session.delete(debt)
+            session.commit()
 
 
-def save_task(title, who, due_date_str, callback):
-    if not title.value:
-        return
+def delete_manual_debts_by_pair(from_id: int, to_id: int) -> None:
+    with get_session() as session:
+        session.query(ManualDebt).filter(
+            ManualDebt.from_user_id == from_id,
+            ManualDebt.to_user_id == to_id,
+        ).delete()
+        session.commit()
 
+
+def save_settlement(from_id: int, to_id: int, amount: float, method: str, note: str = "") -> None:
+    """Erfasst einen Ausgleich als Expense und löscht zugehörige manuelle Schulden."""
+    desc = note if note.strip() else f"Ausgleich via {method}"
+    with get_session() as session:
+        expense = Expense(description=desc, amount=amount, category="Ausgleich", paid_by_id=from_id)
+        to_user = session.get(MitbewohnerDB, to_id)
+        if to_user:
+            expense.participants.append(to_user)
+        session.add(expense)
+        session.query(ManualDebt).filter(
+            ManualDebt.from_user_id == from_id,
+            ManualDebt.to_user_id == to_id,
+        ).delete()
+        session.commit()
+
+
+# ── Aufgaben ───────────────────────────────────────────────────────────────────
+
+def save_task(title_val: str, who_id, due_date_str: str) -> str | None:
+    """Legt ein neues Ämtli an. Gibt eine Fehlermeldung zurück oder None bei Erfolg."""
+    if not title_val or not title_val.strip():
+        return "Titel darf nicht leer sein"
     due_date = None
     if due_date_str:
         try:
             due_date = datetime.strptime(due_date_str, "%d.%m.%Y")
         except ValueError:
-            ui.notify("Ungültiges Datum – bitte TT.MM.JJJJ verwenden", color="warning")
-            return
-
-    session = get_session()
-    session.add(Task(title=title.value, assigned_to_id=who.value, due_date=due_date))
-    session.commit()
-    session.close()
-    ui.notify("Neues Ämtli erstellt", color="positive")
-    callback()
-
-
-# Markiert eine Aufgabe als erledigt/nicht erledigt.
-def update_task_status(task, value, callback):
-    session = get_session()
-    task.is_done = value
-    session.merge(task)
-    session.commit()
-    session.close()
-    callback()
-
-
-# Loescht einen Benutzer.
-def delete_user(user, callback):
-    session = get_session()
-    user_to_delete = session.get(MitbewohnerDB, user.id)
-    if user_to_delete:
-        session.delete(user_to_delete)
+            return "Ungültiges Datum – bitte TT.MM.JJJJ verwenden"
+    with get_session() as session:
+        session.add(Task(title=title_val.strip(), assigned_to_id=who_id, due_date=due_date))
         session.commit()
-    session.close()
-    ui.notify("Eintrag geloescht", color="negative")
-    callback()
+    return None
 
 
-# Oeffnet den Bearbeiten-Dialog fuer einen Benutzer.
-def edit_user(user, callback):
-    with ui.dialog() as dialog, ui.card():
-        ui.label(f"Bearbeite {user.name}").classes("text-h6")
-        name_input = ui.input(value=user.name)
-        with ui.row():
-            ui.button(
-                "Speichern",
-                on_click=lambda: (save_user_edit(user.id, name_input.value, dialog), callback()),
-            )
-            ui.button("Abbrechen", on_click=dialog.close).props("flat")
-    dialog.open()
+def update_task_status(task_id: int, value: bool) -> None:
+    with get_session() as session:
+        task = session.get(Task, task_id)
+        if task:
+            task.is_done = value
+            session.commit()
 
 
-# ── Blog ──────────────────────────────────────────────────────────────────────
+# ── Mitbewohner ────────────────────────────────────────────────────────────────
 
-def add_post(author_id, content, is_important, callback):
-    session = get_session()
-    session.add(Post(author_id=author_id, content=content.strip(), is_important=is_important))
-    session.commit()
-    session.close()
-    ui.notify("Nachricht veröffentlicht", color="positive")
-    callback()
-
-
-def delete_post(post_id, callback):
-    session = get_session()
-    post = session.get(Post, post_id)
-    if post:
-        session.delete(post)
+def add_user(name: str) -> None:
+    with get_session() as session:
+        session.add(MitbewohnerDB(name=name))
         session.commit()
-    session.close()
-    callback()
 
 
-def toggle_post_important(post_id, callback):
-    session = get_session()
-    post = session.get(Post, post_id)
-    if post:
-        post.is_important = not post.is_important
+def delete_user(user_id: int) -> None:
+    with get_session() as session:
+        user = session.get(MitbewohnerDB, user_id)
+        if user:
+            session.delete(user)
+            session.commit()
+
+
+def save_user_edit(user_id: int, new_name: str) -> None:
+    with get_session() as session:
+        user = session.get(MitbewohnerDB, user_id)
+        if user:
+            user.name = new_name
+            session.commit()
+
+
+# ── Blog ───────────────────────────────────────────────────────────────────────
+
+def add_post(author_id: int, content: str, is_important: bool) -> None:
+    with get_session() as session:
+        session.add(Post(author_id=author_id, content=content.strip(), is_important=is_important))
         session.commit()
-    session.close()
-    callback()
 
 
-# ── Reaktionen ────────────────────────────────────────────────────────────────
+def delete_post(post_id: int) -> None:
+    with get_session() as session:
+        post = session.get(Post, post_id)
+        if post:
+            session.delete(post)
+            session.commit()
+
+
+def toggle_post_important(post_id: int) -> None:
+    with get_session() as session:
+        post = session.get(Post, post_id)
+        if post:
+            post.is_important = not post.is_important
+            session.commit()
+
 
 def toggle_reaction(user_id: int, post_id: int, emoji: str) -> tuple[dict, list]:
-    session = get_session()
+    with get_session() as session:
+        existing = session.query(Reaction).filter(
+            Reaction.user_id == user_id,
+            Reaction.post_id == post_id,
+        ).first()
 
-    # Pro User darf nur eine Reaktion pro Post existieren
-    existing = session.query(Reaction).filter(
-        Reaction.user_id == user_id,
-        Reaction.post_id == post_id,
-    ).first()
-
-    if existing:
-        if existing.emoji == emoji:
-            # Gleicher Emoji → entfernen (toggle off)
-            session.delete(existing)
+        if existing:
+            if existing.emoji == emoji:
+                session.delete(existing)
+            else:
+                existing.emoji = emoji
         else:
-            # Anderer Emoji → ersetzen
-            existing.emoji = emoji
-    else:
-        session.add(Reaction(user_id=user_id, post_id=post_id, emoji=emoji))
+            session.add(Reaction(user_id=user_id, post_id=post_id, emoji=emoji))
 
-    session.commit()
+        session.commit()
 
-    reactions_count: dict[str, int] = {}
-    user_reactions: list[str] = []
-    for r in session.query(Reaction).filter(Reaction.post_id == post_id).all():
-        reactions_count[r.emoji] = reactions_count.get(r.emoji, 0) + 1
-        if r.user_id == user_id:
-            user_reactions.append(r.emoji)
+        reactions_count: dict[str, int] = {}
+        user_reactions: list[str] = []
+        for r in session.query(Reaction).filter(Reaction.post_id == post_id).all():
+            reactions_count[r.emoji] = reactions_count.get(r.emoji, 0) + 1
+            if r.user_id == user_id:
+                user_reactions.append(r.emoji)
 
-    session.close()
     return reactions_count, user_reactions
 
 
 # ── Einkaufsliste ──────────────────────────────────────────────────────────────
 
-def add_shopping_item(name, menge, einheit, author_id, callback):
-    session = get_session()
-    session.add(EinkaufsItem(
-        name=name.strip(),
-        menge=menge.strip() if menge else None,
-        einheit=einheit.strip() if einheit else None,
-        author_id=author_id,
-    ))
-    session.commit()
-    session.close()
-    ui.notify(f'"{name}" hinzugefügt', color="positive")
-    callback()
-
-
-def toggle_shopping_item(item_id, is_bought, callback):
-    session = get_session()
-    item = session.get(EinkaufsItem, item_id)
-    if item:
-        item.is_bought = is_bought
+def add_shopping_item(name: str, menge: str, einheit: str, author_id: int) -> None:
+    with get_session() as session:
+        session.add(EinkaufsItem(
+            name=name.strip(),
+            menge=menge.strip() if menge else None,
+            einheit=einheit.strip() if einheit else None,
+            author_id=author_id,
+        ))
         session.commit()
-    session.close()
-    callback()
 
 
-def delete_shopping_item(item_id, callback):
-    session = get_session()
-    item = session.get(EinkaufsItem, item_id)
-    if item:
-        session.delete(item)
+def toggle_shopping_item(item_id: int, is_bought: bool) -> None:
+    with get_session() as session:
+        item = session.get(EinkaufsItem, item_id)
+        if item:
+            item.is_bought = is_bought
+            session.commit()
+
+
+def delete_shopping_item(item_id: int) -> None:
+    with get_session() as session:
+        item = session.get(EinkaufsItem, item_id)
+        if item:
+            session.delete(item)
+            session.commit()
+
+
+def delete_bought_items() -> None:
+    with get_session() as session:
+        session.query(EinkaufsItem).filter(EinkaufsItem.is_bought == True).delete()
         session.commit()
-    session.close()
-    callback()
-
-
-def delete_bought_items(callback):
-    session = get_session()
-    session.query(EinkaufsItem).filter(EinkaufsItem.is_bought == True).delete()
-    session.commit()
-    session.close()
-    ui.notify("Erledigte Artikel gelöscht", color="positive")
-    callback()
-
-
-# Speichert den geaenderten Benutzernamen.
-def save_user_edit(user_id, new_name, dialog):
-    session = get_session()
-    user = session.get(MitbewohnerDB, user_id)
-    if user:
-        user.name = new_name
-    session.commit()
-    session.close()
-    dialog.close()

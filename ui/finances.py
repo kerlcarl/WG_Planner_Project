@@ -11,6 +11,7 @@ from services import (
     delete_manual_debts_by_pair,
     get_session,
     save_expense,
+    save_settlement,
 )
 
 _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
@@ -145,12 +146,13 @@ def render_finances_tab(container, current_user_id: int = None):
                     category_field = _CategoryField()
 
                     def handle_save():
-                        def refresh_and_close():
-                            expense_dialog.close()
-                            refresh()
-
-                        # Persistiert die Ausgabe in services.py und aktualisiert danach den Tab.
-                        save_expense(desc, amt, category_field, payer, parts, refresh_and_close)
+                        if not desc.value or not amt.value or not payer.value or not category_field.value:
+                            ui.notify("Bitte alle Pflichtfelder ausfüllen", color="warning")
+                            return
+                        save_expense(desc.value, amt.value, category_field.value, payer.value, parts.value)
+                        ui.notify("Ausgabe erfolgreich gespeichert", color="positive")
+                        expense_dialog.close()
+                        refresh()
 
                     desc.on("keydown.enter", handle_save)
                     with ui.row().classes("w-full justify-end gap-2 pt-2"):
@@ -317,30 +319,8 @@ def render_finances_tab(container, current_user_id: int = None):
                 def _save_settlement(
                     from_id: int, to_id: int, amount: float, method: str, note: str = ""
                 ) -> None:
-                    _settlement_desc = note if note else f"Ausgleich via {method}"
-                    _s = get_session()
-                    expense = Expense(
-                        description=_settlement_desc,
-                        amount=amount,
-                        category="Ausgleich",
-                        paid_by_id=from_id,
-                    )
-                    to_user = _s.get(MitbewohnerDB, to_id)
-                    if to_user:
-                        expense.participants.append(to_user)
-                    _s.add(expense)
-                    # Zugehörige manuelle Schulden dieses Paares ebenfalls löschen,
-                    # da sie im bezahlten Betrag bereits enthalten sind.
-                    _s.query(ManualDebt).filter(
-                        ManualDebt.from_user_id == from_id,
-                        ManualDebt.to_user_id == to_id,
-                    ).delete()
-                    _s.commit()
-                    _s.close()
-                    ui.notify(
-                        f"Ausgleich CHF {amount:.2f} via {method} erfasst",
-                        color="positive",
-                    )
+                    save_settlement(from_id, to_id, amount, method, note)
+                    ui.notify(f"Ausgleich CHF {amount:.2f} via {method} erfasst", color="positive")
                     refresh()
 
                 # ── Dialog: Manueller Ausgleich ───────────────────────────────
@@ -385,20 +365,18 @@ def render_finances_tab(container, current_user_id: int = None):
                             if man_from.value == man_to.value:
                                 ui.notify("'Von' und 'An' dürfen nicht dieselbe Person sein.", color="warning")
                                 return
-
-                            def _after_create():
-                                man_from.value = None
-                                man_to.value = None
-                                man_amt.value = None
-                                man_note.value = ""
-                                manual_dialog.close()
-                                refresh()
-
-                            create_manual_debt(
+                            msg = create_manual_debt(
                                 man_from.value, man_to.value,
                                 man_amt.value, man_method.value,
-                                man_note.value, _after_create,
+                                man_note.value,
                             )
+                            ui.notify(msg, color="positive")
+                            man_from.value = None
+                            man_to.value = None
+                            man_amt.value = None
+                            man_note.value = ""
+                            manual_dialog.close()
+                            refresh()
 
                         with ui.row().classes("w-full justify-end gap-2"):
                             ui.button("Abbrechen", on_click=manual_dialog.close).props("flat")
@@ -504,8 +482,10 @@ def render_finances_tab(container, current_user_id: int = None):
                                         ui.button(
                                             "Als bezahlt markieren",
                                             icon="check",
-                                            on_click=lambda fi=from_id, ti=to_id: delete_manual_debts_by_pair(
-                                                fi, ti, refresh
+                                            on_click=lambda fi=from_id, ti=to_id: (
+                                                delete_manual_debts_by_pair(fi, ti),
+                                                ui.notify("Ausgleich als bezahlt markiert", color="positive"),
+                                                refresh(),
                                             ),
                                         ).style(
                                             "background: #f97316; color: white; border-radius: 10px; "
@@ -583,7 +563,11 @@ def render_finances_tab(container, current_user_id: int = None):
                                     ).classes("text-xs text-gray-400")
                                 ui.button(
                                     icon="delete",
-                                    on_click=lambda e=expense: delete_expense(e, refresh),
+                                    on_click=lambda e=expense: (
+                                        delete_expense(e.id),
+                                        ui.notify("Ausgabe gelöscht", color="negative"),
+                                        refresh(),
+                                    ),
                                 ).props("flat round color=red")
                             ui.separator().classes("mx-3")
                             ui.label(

@@ -311,7 +311,7 @@ async function reactToPost(postId, emoji, userId) {
     # Renderer liefern Refresh-Funktionen zurueck, damit Daten neu geladen werden koennen.
     finances_refresh = render_finances_tab(finances_container, user_id)
     tasks_refresh = render_tasks_tab(tasks_container, user_id)
-    collab_refresh = render_collab_tab(collab_container, user_id)
+    collab_refresh = render_collab_tab(collab_container)
     render_users_tab(
         users_container,
         on_users_changed=lambda: (finances_refresh(), tasks_refresh(), collab_refresh()),

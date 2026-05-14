@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from nicegui import ui
+from nicegui import app, ui
 
 from models import EinkaufsItem, MitbewohnerDB, Post, Reaction
 from services import (
@@ -25,7 +25,8 @@ def _blog_color(name: str) -> str:
     return _BLOG_PALETTE[sum(ord(c) for c in name) % len(_BLOG_PALETTE)]
 
 
-def render_collab_tab(container, current_user_id: int):
+# current_user_id wird per app.storage pro Verbindung gelesen – kein Parameter nötig.
+def render_collab_tab(container):
     _timers: list = []
 
     def _build():
@@ -34,10 +35,12 @@ def render_collab_tab(container, current_user_id: int):
         _timers.clear()
         container.clear()
 
-        sess = get_session()
-        users = sess.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
-        users_dict = {u.id: u.name for u in users}
-        sess.close()
+        # User-ID frisch aus der Session lesen (pro Verbindung eindeutig)
+        current_user_id = app.storage.user.get("user_id")
+
+        with get_session() as sess:
+            users = sess.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
+            users_dict = {u.id: u.name for u in users}
 
         with container:
             # ── Hero ────────────────────────────────────────────────────────────
@@ -156,9 +159,6 @@ def render_collab_tab(container, current_user_id: int):
             shop_list = ui.column().classes("w-full")
 
         # ── Refresh-Funktionen ───────────────────────────────────────────────
-        # WICHTIG: Alle Relationship-Attribute (z. B. post.author.name) werden
-        # innerhalb der offenen Session in Dicts kopiert, BEVOR sess.close()
-        # aufgerufen wird. Sonst schlägt SQLAlchemy Lazy-Loading fehl.
 
         _REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"]
 
@@ -168,33 +168,31 @@ def render_collab_tab(container, current_user_id: int):
 
         def refresh_blog():
             blog_feed.clear()
-            sess = get_session()
-            posts = sess.query(Post).order_by(Post.created_at.desc()).all()
-            post_ids = [p.id for p in posts]
+            with get_session() as sess:
+                posts = sess.query(Post).order_by(Post.created_at.desc()).all()
+                post_ids = [p.id for p in posts]
 
-            # Pro Post: Reaktoren pro Emoji (Namen) + eigene Reaktion des aktuellen Users
-            reactor_names: dict[int, dict[str, list[str]]] = {}
-            user_emoji_by_post: dict[int, str] = {}
-            if post_ids:
-                for r in sess.query(Reaction).filter(Reaction.post_id.in_(post_ids)).all():
-                    name = users_dict.get(r.user_id, "?")
-                    reactor_names.setdefault(r.post_id, {}).setdefault(r.emoji, []).append(name)
-                    if r.user_id == current_user_id:
-                        user_emoji_by_post[r.post_id] = r.emoji
+                reactor_names: dict[int, dict[str, list[str]]] = {}
+                user_emoji_by_post: dict[int, str] = {}
+                if post_ids:
+                    for r in sess.query(Reaction).filter(Reaction.post_id.in_(post_ids)).all():
+                        name = users_dict.get(r.user_id, "?")
+                        reactor_names.setdefault(r.post_id, {}).setdefault(r.emoji, []).append(name)
+                        if r.user_id == current_user_id:
+                            user_emoji_by_post[r.post_id] = r.emoji
 
-            rows = [
-                {
-                    "id": p.id,
-                    "content": p.content,
-                    "is_important": p.is_important,
-                    "created_at": p.created_at,
-                    "author_name": p.author.name if p.author else "Unbekannt",
-                    "reactor_names": reactor_names.get(p.id, {}),
-                    "my_emoji": user_emoji_by_post.get(p.id),
-                }
-                for p in posts
-            ]
-            sess.close()
+                rows = [
+                    {
+                        "id": p.id,
+                        "content": p.content,
+                        "is_important": p.is_important,
+                        "created_at": p.created_at,
+                        "author_name": p.author.name if p.author else "Unbekannt",
+                        "reactor_names": reactor_names.get(p.id, {}),
+                        "my_emoji": user_emoji_by_post.get(p.id),
+                    }
+                    for p in posts
+                ]
 
             with blog_feed:
                 if not rows:
@@ -217,8 +215,8 @@ def render_collab_tab(container, current_user_id: int):
                     ts = row["created_at"].strftime("%d.%m.%Y · %H:%M") if row["created_at"] else ""
                     post_id = row["id"]
                     color = _blog_color(author_name)
-                    rxn_names = row["reactor_names"]   # emoji → [name, ...]
-                    my_emoji = row["my_emoji"]          # str oder None
+                    rxn_names = row["reactor_names"]
+                    my_emoji = row["my_emoji"]
 
                     with ui.card().classes("w-full mb-3").style(
                         ("border-radius: 14px; border-left: 5px solid #dc2626; background: #fff5f5; "
@@ -251,13 +249,17 @@ def render_collab_tab(container, current_user_id: int):
                                 with ui.row().classes("gap-1 flex-shrink-0"):
                                     ui.button(
                                         icon="star" if imp else "star_outline",
-                                        on_click=lambda pid=post_id: toggle_post_important(pid, refresh_blog),
+                                        on_click=lambda pid=post_id: (
+                                            toggle_post_important(pid), refresh_blog()
+                                        ),
                                     ).props("flat round dense").style(
                                         "color: #dc2626" if imp else "color: #d4d4d4"
                                     )
                                     ui.button(
                                         icon="delete",
-                                        on_click=lambda pid=post_id: delete_post(pid, refresh_blog),
+                                        on_click=lambda pid=post_id: (
+                                            delete_post(pid), refresh_blog()
+                                        ),
                                     ).props("flat round dense").style("color: #ef4444")
 
                             ui.label(row["content"]).style(
@@ -265,7 +267,7 @@ def render_collab_tab(container, current_user_id: int):
                                 "white-space: pre-wrap; word-break: break-word; line-height: 1.55"
                             )
 
-                            # ── Reaktions-Badges (mit Pop-In-Animation) ─────────
+                            # ── Reaktions-Badges ────────────────────────────────
                             active_rxns = {e: names for e, names in rxn_names.items() if names}
                             if active_rxns:
                                 with ui.row().classes("flex-wrap gap-2").style("margin-top: 10px"):
@@ -289,7 +291,7 @@ def render_collab_tab(container, current_user_id: int):
                                             )
                                         badge.tooltip(", ".join(names))
 
-                            # ── Emoji-Picker (1 Emoji pro User wählbar) ─────────
+                            # ── Emoji-Picker ─────────────────────────────────────
                             with ui.row().classes("flex-wrap gap-1").style("margin-top: 8px"):
                                 for emoji in _REACTION_EMOJIS:
                                     is_mine = (my_emoji == emoji)
@@ -309,7 +311,6 @@ def render_collab_tab(container, current_user_id: int):
                                     )
 
         def _render_shop_row(row: dict, refresh_fn):
-            """Rendert eine einzelne Einkaufslisten-Zeile aus einem Dict."""
             is_bought = row["is_bought"]
             item_id = row["id"]
             author_name = row["author_name"]
@@ -328,7 +329,9 @@ def render_collab_tab(container, current_user_id: int):
                 with ui.row().classes("w-full items-center p-3 gap-2"):
                     ui.checkbox(
                         value=is_bought,
-                        on_change=lambda e, iid=item_id: toggle_shopping_item(iid, e.value, refresh_fn),
+                        on_change=lambda e, iid=item_id: (
+                            toggle_shopping_item(iid, e.value), refresh_fn()
+                        ),
                     ).style("flex-shrink: 0; color: #059669")
                     with ui.column().classes("flex-grow gap-0"):
                         ui.label(label).style(
@@ -342,27 +345,27 @@ def render_collab_tab(container, current_user_id: int):
                         )
                     ui.button(
                         icon="close",
-                        on_click=lambda iid=item_id: delete_shopping_item(iid, refresh_fn),
+                        on_click=lambda iid=item_id: (
+                            delete_shopping_item(iid), refresh_fn()
+                        ),
                     ).props("flat round dense").style("color: #d1d5db; flex-shrink: 0")
 
         def refresh_shop():
             shop_list.clear()
             sync_label.text = f"⟳ {datetime.now().strftime('%H:%M:%S')}"
-            sess = get_session()
-            items = sess.query(EinkaufsItem).order_by(EinkaufsItem.created_at.asc()).all()
-            # Daten materialisieren – Session muss noch offen sein
-            rows = [
-                {
-                    "id": i.id,
-                    "name": i.name,
-                    "menge": i.menge,
-                    "einheit": i.einheit,
-                    "is_bought": i.is_bought,
-                    "author_name": i.author.name if i.author else "?",
-                }
-                for i in items
-            ]
-            sess.close()
+            with get_session() as sess:
+                items = sess.query(EinkaufsItem).order_by(EinkaufsItem.created_at.asc()).all()
+                rows = [
+                    {
+                        "id": i.id,
+                        "name": i.name,
+                        "menge": i.menge,
+                        "einheit": i.einheit,
+                        "is_bought": i.is_bought,
+                        "author_name": i.author.name if i.author else "?",
+                    }
+                    for i in items
+                ]
 
             active = [r for r in rows if not r["is_bought"]]
             bought = [r for r in rows if r["is_bought"]]
@@ -402,7 +405,11 @@ def render_collab_tab(container, current_user_id: int):
                     ui.button(
                         f"Alle {len(bought)} Erledigten löschen",
                         icon="cleaning_services",
-                        on_click=lambda: delete_bought_items(refresh_shop),
+                        on_click=lambda: (
+                            delete_bought_items(),
+                            ui.notify("Erledigte Artikel gelöscht", color="positive"),
+                            refresh_shop(),
+                        ),
                     ).classes("w-full mt-4").style(
                         "background: #f1f5f9; color: #64748b; "
                         "border-radius: 10px; font-weight: 600"
@@ -414,26 +421,26 @@ def render_collab_tab(container, current_user_id: int):
             if not blog_content.value or not blog_content.value.strip():
                 ui.notify("Bitte einen Text eingeben", color="warning")
                 return
-            add_post(current_user_id, blog_content.value, blog_important.value, refresh_blog)
+            add_post(current_user_id, blog_content.value, blog_important.value)
+            ui.notify("Nachricht veröffentlicht", color="positive")
             blog_content.value = ""
             blog_important.value = False
+            refresh_blog()
 
         def handle_add_item():
             if not shop_name.value or not shop_name.value.strip():
                 ui.notify("Bitte einen Artikelnamen eingeben", color="warning")
                 return
-            add_shopping_item(
-                shop_name.value, shop_menge.value, shop_einheit.value,
-                current_user_id, refresh_shop,
-            )
+            add_shopping_item(shop_name.value, shop_menge.value, shop_einheit.value, current_user_id)
+            ui.notify(f'"{shop_name.value}" hinzugefügt', color="positive")
             shop_name.value = ""
             shop_menge.value = ""
             shop_einheit.value = ""
+            refresh_shop()
 
         refresh_blog()
         refresh_shop()
 
-        # Einkaufsliste alle 2 s, Blog alle 5 s neu laden (Echtzeit-Sync)
         _timers.append(ui.timer(2.0, refresh_shop))
         _timers.append(ui.timer(5.0, refresh_blog))
 
