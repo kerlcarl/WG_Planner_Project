@@ -312,10 +312,16 @@ async function reactToPost(postId, emoji, userId) {
     finances_refresh = render_finances_tab(finances_container, user_id)
     tasks_refresh = render_tasks_tab(tasks_container, user_id)
     collab_refresh = render_collab_tab(collab_container)
-    render_users_tab(
+    users_refresh = render_users_tab(
         users_container,
         on_users_changed=lambda: (finances_refresh(), tasks_refresh(), collab_refresh()),
     )
+
+    # Alle Tabs alle 10 Sekunden neu laden – so sehen alle Mitbewohner
+    # Änderungen der anderen in Echtzeit. Collab-Tab hat eigene Timer (2s/5s).
+    ui.timer(10.0, users_refresh)
+    ui.timer(10.0, finances_refresh)
+    ui.timer(10.0, tasks_refresh)
 
     def _on_tab_change(e):
         # Finanzen-Tab bei jedem Wechsel neu aufbauen, damit das Layout

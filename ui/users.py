@@ -158,3 +158,4 @@ def render_users_tab(container, on_users_changed=None):
                                 ).props("flat round color=red")
 
     refresh_list()
+    return refresh_list
