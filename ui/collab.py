@@ -64,99 +64,98 @@ def render_collab_tab(container):
                             "color: rgba(255,255,255,0.72); font-size: 0.85rem; margin-top: 4px"
                         )
 
-            # ══════════════════════════════════════════════════════════════════
-            # BLOG
-            # ══════════════════════════════════════════════════════════════════
-            with ui.row().classes("items-center gap-3 mb-4"):
-                with ui.element("div").style(
-                    "background: #7c3aed; border-radius: 10px; width: 34px; height: 34px; "
-                    "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
-                ):
-                    ui.icon("campaign").style("color: white; font-size: 1.15rem")
-                with ui.column().classes("gap-0"):
-                    ui.label("WG-Blog").style(
-                        "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
-                    )
-                    ui.label("Schwarzes Brett der WG").style(
-                        "font-size: 0.78rem; color: #94a3b8"
-                    )
+            # 3-Spalten-Layout
+            with ui.element("div").classes("wg-grid-3"):
 
-            # Blog-Formular
-            with ui.card().classes("w-full mb-5").style(
-                "border-radius: 18px; border: 1.5px solid #ede9fe; "
-                "box-shadow: 0 4px 16px rgba(124,58,237,0.07); padding: 20px"
-            ):
-                with ui.row().classes("items-center gap-2 mb-3"):
-                    ui.icon("edit_note").style("color: #7c3aed; font-size: 1.3rem")
-                    ui.label("Neue Nachricht verfassen").style(
-                        "font-weight: 700; color: #4c1d95; font-size: 0.95rem"
-                    )
+                # ── Spalte 1: Blog-Formular ───────────────────────────────────
+                with ui.element("div"):
+                    with ui.row().classes("items-center gap-3 mb-4"):
+                        with ui.element("div").style(
+                            "background: #7c3aed; border-radius: 10px; width: 34px; height: 34px; "
+                            "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                        ):
+                            ui.icon("campaign").style("color: white; font-size: 1.15rem")
+                        with ui.column().classes("gap-0"):
+                            ui.label("WG-Blog").style(
+                                "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
+                            )
+                            ui.label("Schwarzes Brett der WG").style(
+                                "font-size: 0.78rem; color: #94a3b8"
+                            )
 
-                blog_content = ui.textarea(
-                    "Inhalt", placeholder="Was möchtest du der WG mitteilen?"
-                ).classes("w-full mt-2").props("rows=3 outlined")
-                blog_important = ui.checkbox("Als wichtig markieren").classes("mt-1")
-                blog_important.style("color: #dc2626")
-
-                ui.button(
-                    "Veröffentlichen", icon="send",
-                    on_click=lambda: handle_post(),
-                ).props("unelevated").classes("bg-violet-700 text-white mt-3").style(
-                    "border-radius: 10px; font-weight: 600"
-                )
-
-            # Blog-Feed (dynamisch — wird von refresh_blog() befüllt)
-            blog_feed = ui.column().classes("w-full mb-8")
-
-            # ══════════════════════════════════════════════════════════════════
-            # EINKAUFSLISTE
-            # ══════════════════════════════════════════════════════════════════
-            ui.separator().classes("mb-6")
-
-            with ui.row().classes("items-center justify-between mb-4 flex-wrap gap-2"):
-                with ui.row().classes("items-center gap-3"):
-                    with ui.element("div").style(
-                        "background: #059669; border-radius: 10px; width: 34px; height: 34px; "
-                        "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                    with ui.card().classes("w-full").style(
+                        "border-radius: 18px; border: 1.5px solid #ede9fe; "
+                        "box-shadow: 0 4px 16px rgba(124,58,237,0.07); padding: 20px"
                     ):
-                        ui.icon("shopping_cart").style("color: white; font-size: 1.15rem")
-                    with ui.column().classes("gap-0"):
-                        ui.label("Einkaufsliste").style(
-                            "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
+                        with ui.row().classes("items-center gap-2 mb-3"):
+                            ui.icon("edit_note").style("color: #7c3aed; font-size: 1.3rem")
+                            ui.label("Neue Nachricht verfassen").style(
+                                "font-weight: 700; color: #4c1d95; font-size: 0.95rem"
+                            )
+                        blog_content = ui.textarea(
+                            "Inhalt", placeholder="Was möchtest du der WG mitteilen?"
+                        ).classes("w-full mt-2").props("rows=4 outlined")
+                        blog_important = ui.checkbox("Als wichtig markieren").classes("mt-1")
+                        blog_important.style("color: #dc2626")
+                        ui.button(
+                            "Veröffentlichen", icon="send",
+                            on_click=lambda: handle_post(),
+                        ).props("unelevated").classes("w-full bg-violet-700 text-white mt-3").style(
+                            "border-radius: 10px; font-weight: 600"
                         )
-                        ui.label("Echtzeit-Sync für alle Mitbewohner*innen").style(
-                            "font-size: 0.78rem; color: #94a3b8"
+
+                # ── Spalte 2: Blog-Feed ───────────────────────────────────────
+                with ui.element("div"):
+                    with ui.row().classes("items-center gap-2 mb-4"):
+                        ui.icon("forum").style("color: #7c3aed; font-size: 1.2rem")
+                        ui.label("Nachrichten").style(
+                            "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
                         )
-                sync_label = ui.label("").style(
-                    "font-size: 0.68rem; color: #94a3b8; background: #f1f5f9; "
-                    "padding: 3px 10px; border-radius: 999px; font-family: monospace"
-                )
+                    blog_feed = ui.column().classes("w-full")
 
-            # Einkauf-Formular
-            with ui.card().classes("w-full mb-5").style(
-                "border-radius: 18px; border: 1.5px solid #d1fae5; "
-                "box-shadow: 0 4px 16px rgba(5,150,105,0.07); padding: 20px"
-            ):
-                with ui.row().classes("items-center gap-2 mb-3"):
-                    ui.icon("add_shopping_cart").style("color: #059669; font-size: 1.3rem")
-                    ui.label("Artikel hinzufügen").style(
-                        "font-weight: 700; color: #065f46; font-size: 0.95rem"
-                    )
+                # ── Spalte 3: Einkaufsliste ───────────────────────────────────
+                with ui.element("div"):
+                    with ui.row().classes("items-center justify-between mb-4 gap-2"):
+                        with ui.row().classes("items-center gap-3"):
+                            with ui.element("div").style(
+                                "background: #059669; border-radius: 10px; width: 34px; height: 34px; "
+                                "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
+                            ):
+                                ui.icon("shopping_cart").style("color: white; font-size: 1.15rem")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Einkaufsliste").style(
+                                    "font-size: 1.1rem; font-weight: 800; color: #1e1b4b; line-height: 1.2"
+                                )
+                                ui.label("Echtzeit-Sync").style(
+                                    "font-size: 0.78rem; color: #94a3b8"
+                                )
+                        sync_label = ui.label("").style(
+                            "font-size: 0.68rem; color: #94a3b8; background: #f1f5f9; "
+                            "padding: 3px 10px; border-radius: 999px; font-family: monospace"
+                        )
 
-                shop_name = ui.input("Artikel *", placeholder="z. B. Milch").classes("w-full")
-                with ui.row().classes("w-full gap-2 mt-2"):
-                    shop_menge = ui.input("Menge", placeholder="z. B. 2").classes("flex-1")
-                    shop_einheit = ui.input("Einheit", placeholder="z. B. Liter").classes("flex-1")
-                shop_name.on("keydown.enter", lambda: handle_add_item())
-                ui.button(
-                    "Hinzufügen", icon="add",
-                    on_click=lambda: handle_add_item(),
-                ).props("unelevated").classes("w-full bg-emerald-600 text-white mt-3").style(
-                    "border-radius: 10px; font-weight: 600"
-                )
+                    with ui.card().classes("w-full mb-4").style(
+                        "border-radius: 18px; border: 1.5px solid #d1fae5; "
+                        "box-shadow: 0 4px 16px rgba(5,150,105,0.07); padding: 20px"
+                    ):
+                        with ui.row().classes("items-center gap-2 mb-3"):
+                            ui.icon("add_shopping_cart").style("color: #059669; font-size: 1.3rem")
+                            ui.label("Artikel hinzufügen").style(
+                                "font-weight: 700; color: #065f46; font-size: 0.95rem"
+                            )
+                        shop_name = ui.input("Artikel *", placeholder="z. B. Milch").classes("w-full")
+                        with ui.row().classes("w-full gap-2 mt-2"):
+                            shop_menge = ui.input("Menge", placeholder="z. B. 2").classes("flex-1")
+                            shop_einheit = ui.input("Einheit", placeholder="z. B. Liter").classes("flex-1")
+                        shop_name.on("keydown.enter", lambda: handle_add_item())
+                        ui.button(
+                            "Hinzufügen", icon="add",
+                            on_click=lambda: handle_add_item(),
+                        ).props("unelevated").classes("w-full bg-emerald-600 text-white mt-3").style(
+                            "border-radius: 10px; font-weight: 600"
+                        )
 
-            # Einkaufsliste (dynamisch — wird von refresh_shop() befüllt)
-            shop_list = ui.column().classes("w-full")
+                    shop_list = ui.column().classes("w-full")
 
         # ── Refresh-Funktionen ───────────────────────────────────────────────
 

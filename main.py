@@ -60,6 +60,29 @@ body {
   100% { transform: scale(1);    opacity: 1; }
 }
 .rx-badge-anim { animation: rx-badge-pop 0.30s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.wg-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.wg-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  align-items: start;
+}
+.wg-cards-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1200px) {
+  .wg-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 800px) {
+  .wg-grid-3, .wg-grid-2, .wg-cards-2 { grid-template-columns: 1fr; }
+}
 """
 
 
