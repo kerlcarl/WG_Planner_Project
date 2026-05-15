@@ -19,8 +19,12 @@ _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
 
 # Rendert den Finanz-Tab und liefert eine Refresh-Funktion fuer Neuaufbau.
 def render_finances_tab(container, current_user_id: int = None):
+    _dialog_open = {"value": False}
+
     # Liest aktuelle Daten, berechnet Kennzahlen und baut alle UI-Karten neu.
     def refresh():
+        if _dialog_open["value"]:
+            return
         container.clear()
         session = get_session()
         # Abgeleitete Werte werden zur Laufzeit berechnet (nicht separat gespeichert).
@@ -72,14 +76,14 @@ def render_finances_tab(container, current_user_id: int = None):
                             )
                 ui.button(
                     "+ Neue Ausgabe erfassen",
-                    on_click=lambda: expense_dialog.open(),
+                    on_click=lambda: (_dialog_open.update(value=True), expense_dialog.open()),
                 ).style(
                     "background: #059669; color: white; border-radius: 12px; "
                     "font-weight: 700; margin-top: 16px; padding: 10px 20px; width: 100%"
                 )
 
             # ── Ausgabe-Erfassen-Dialog ───────────────────────────────────────
-            with ui.dialog() as expense_dialog, ui.card().classes(
+            with ui.dialog().props("persistent") as expense_dialog, ui.card().classes(
                 "w-[42rem] max-w-[95vw] rounded-2xl shadow-xl"
             ):
                 with ui.row().classes("w-full items-center justify-between p-5 pb-2"):
@@ -88,7 +92,7 @@ def render_finances_tab(container, current_user_id: int = None):
                         ui.label(
                             "Betrag, zahlende Person und beteiligte Mitbewohner*innen festlegen."
                         ).classes("text-sm text-slate-500")
-                    ui.button(icon="close", on_click=expense_dialog.close).props("flat round")
+                    ui.button(icon="close", on_click=lambda: (_dialog_open.update(value=False), expense_dialog.close())).props("flat round")
 
                 with ui.column().classes("w-full gap-4 px-5 pb-5 pt-3"):
                     # Formfelder fuer neue Ausgabe.
@@ -121,9 +125,14 @@ def render_finances_tab(container, current_user_id: int = None):
                                 "text-sm font-medium text-slate-700"
                             )
                             with ui.column().classes("gap-2"):
-                                selected_parts_checkboxes = {
-                                    user.id: ui.checkbox(user.name) for user in users
-                                }
+                                selected_parts_checkboxes = {}
+                                for user in users:
+                                    cb = ui.checkbox(user.name, on_change=lambda e: _check_parts())
+                                    selected_parts_checkboxes[user.id] = cb
+                            ui.label("Mindestens 2 Personen erforderlich").classes(
+                                "text-xs text-slate-400 mt-1"
+                            )
+                            parts_err = ui.label("").classes("text-xs text-red-500 mt-1")
 
                     class _PartsGroup:
                         def __init__(self, checkboxes):
@@ -138,7 +147,6 @@ def render_finances_tab(container, current_user_id: int = None):
                     class _CategoryField:
                         @property
                         def value(self):
-                            # Nutzt freie Eingabe nur bei "Andere...".
                             if cat_select.value == "Andere...":
                                 return custom_category.value.strip()
                             return cat_select.value
@@ -149,15 +157,32 @@ def render_finances_tab(container, current_user_id: int = None):
                         if not desc.value or not amt.value or not payer.value or not category_field.value:
                             ui.notify("Bitte alle Pflichtfelder ausfüllen", color="warning")
                             return
-                        save_expense(desc.value, amt.value, category_field.value, payer.value, parts.value)
+                        if len(parts.value) < 2:
+                            parts_err.set_text("Es müssen mindestens 2 Personen an einer Ausgabe beteiligt sein.")
+                            ui.notify("Mindestens 2 Personen erforderlich", color="warning")
+                            return
+                        try:
+                            save_expense(desc.value, amt.value, category_field.value, payer.value, parts.value)
+                        except ValueError as e:
+                            ui.notify(str(e), color="warning")
+                            return
                         ui.notify("Ausgabe erfolgreich gespeichert", color="positive")
+                        _dialog_open["value"] = False
                         expense_dialog.close()
                         refresh()
 
-                    desc.on("keydown.enter", handle_save)
+                    def _check_parts():
+                        count = len(parts.value)
+                        if count < 2:
+                            parts_err.set_text("Es müssen mindestens 2 Personen beteiligt sein.")
+                            save_btn.props("disabled")
+                        else:
+                            parts_err.set_text("")
+                            save_btn.props(remove="disabled")
+
                     with ui.row().classes("w-full justify-end gap-2 pt-2"):
-                        ui.button("Abbrechen", on_click=expense_dialog.close).props("flat")
-                        ui.button("Speichern", on_click=handle_save).classes("bg-green-600 text-white")
+                        ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), expense_dialog.close())).props("flat")
+                        save_btn = ui.button("Speichern", on_click=handle_save).classes("bg-green-600 text-white").props("disabled")
 
             # ── 3-Spalten-Layout ──────────────────────────────────────────────
             with ui.element("div").classes("wg-grid-3"):
@@ -207,7 +232,7 @@ def render_finances_tab(container, current_user_id: int = None):
 
                         _pay_state: dict = {"from_id": None, "to_id": None, "amount": 0.0}
 
-                        with ui.dialog() as pay_dialog, ui.card().classes(
+                        with ui.dialog().props("persistent") as pay_dialog, ui.card().classes(
                             "w-[36rem] max-w-[95vw] rounded-2xl shadow-xl"
                         ):
                             with ui.row().classes("w-full items-center justify-between p-5 pb-2"):
@@ -216,7 +241,7 @@ def render_finances_tab(container, current_user_id: int = None):
                                     ui.label("Zahlungsdetails prüfen und Methode wählen.").classes(
                                         "text-sm text-slate-500"
                                     )
-                                ui.button(icon="close", on_click=pay_dialog.close).props("flat round")
+                                ui.button(icon="close", on_click=lambda: (_dialog_open.update(value=False), pay_dialog.close())).props("flat round")
                             with ui.column().classes("w-full gap-4 px-5 pb-5 pt-2"):
                                 with ui.element("div").style(
                                     "background: #eef2ff; border-radius: 14px; padding: 16px 20px"
@@ -255,10 +280,11 @@ def render_finances_tab(container, current_user_id: int = None):
                                     note = pay_note_input.value.strip()
                                     _save_settlement(s["from_id"], s["to_id"], s["amount"], pay_method_sel.value, note)
                                     pay_note_input.value = ""
+                                    _dialog_open["value"] = False
                                     pay_dialog.close()
 
                                 with ui.row().classes("w-full justify-end gap-2"):
-                                    ui.button("Abbrechen", on_click=pay_dialog.close).props("flat")
+                                    ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), pay_dialog.close())).props("flat")
                                     ui.button("Zahlung bestätigen", on_click=confirm_auto_pay).style(
                                         "background: #4f46e5; color: white; border-radius: 10px; font-weight: 600"
                                     )
@@ -270,6 +296,7 @@ def render_finances_tab(container, current_user_id: int = None):
                             pay_from_label.set_text(user_names.get(s["from_user_id"], "?"))
                             pay_to_label.set_text(user_names.get(s["to_user_id"], "?"))
                             pay_amount_label.set_text(f"CHF {s['amount']:.2f}")
+                            _dialog_open["value"] = True
                             pay_dialog.open()
 
                         def _save_settlement(
@@ -279,7 +306,7 @@ def render_finances_tab(container, current_user_id: int = None):
                             ui.notify(f"Ausgleich CHF {amount:.2f} via {method} erfasst", color="positive")
                             refresh()
 
-                        with ui.dialog() as manual_dialog, ui.card().classes(
+                        with ui.dialog().props("persistent") as manual_dialog, ui.card().classes(
                             "w-[38rem] max-w-[95vw] rounded-2xl shadow-xl"
                         ):
                             with ui.row().classes("w-full items-center justify-between p-5 pb-2"):
@@ -288,7 +315,7 @@ def render_finances_tab(container, current_user_id: int = None):
                                     ui.label(
                                         "Eigene Zahlung hinzufügen, die nicht automatisch berechnet wurde."
                                     ).classes("text-sm text-slate-500")
-                                ui.button(icon="close", on_click=manual_dialog.close).props("flat round")
+                                ui.button(icon="close", on_click=lambda: (_dialog_open.update(value=False), manual_dialog.close())).props("flat round")
                             with ui.column().classes("w-full gap-4 px-5 pb-5 pt-2"):
                                 with ui.row().classes("w-full gap-4"):
                                     man_from = ui.select(
@@ -318,11 +345,12 @@ def render_finances_tab(container, current_user_id: int = None):
                                     man_to.value = None
                                     man_amt.value = None
                                     man_note.value = ""
+                                    _dialog_open["value"] = False
                                     manual_dialog.close()
                                     refresh()
 
                                 with ui.row().classes("w-full justify-end gap-2"):
-                                    ui.button("Abbrechen", on_click=manual_dialog.close).props("flat")
+                                    ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), manual_dialog.close())).props("flat")
                                     ui.button("Erfassen", on_click=confirm_manual).style(
                                         "background: #6366f1; color: white; border-radius: 10px; font-weight: 600"
                                     )
@@ -430,7 +458,7 @@ def render_finances_tab(container, current_user_id: int = None):
                                             ui.label("Keine offenen Ausgleichszahlungen.").classes("text-sm text-green-600")
 
                         with ui.row().classes("w-full justify-end px-4 pb-4 pt-2"):
-                            ui.button("Weiteren Ausgleich erfassen", icon="add", on_click=manual_dialog.open).style(
+                            ui.button("Weiteren Ausgleich erfassen", icon="add", on_click=lambda: (_dialog_open.update(value=True), manual_dialog.open())).style(
                                 "background: #6366f1; color: white; border-radius: 10px; font-weight: 600"
                             )
 

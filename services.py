@@ -92,6 +92,8 @@ def calculate_category_totals() -> list[dict[str, float]]:
 
 
 def save_expense(desc: str, amt: float, cat: str, payer_id: int, participant_ids: list[int]) -> None:
+    if len(participant_ids) < 2:
+        raise ValueError("Es müssen mindestens 2 Personen an einer Ausgabe beteiligt sein.")
     with get_session() as session:
         expense = Expense(description=desc, amount=amt, category=cat, paid_by_id=payer_id)
         for uid in participant_ids:

@@ -10,6 +10,7 @@ from ui import (
     register_login_page,
     register_register_page,
     register_reset_password_page,
+    register_select_user_page,
     register_settings_page,
     render_collab_tab,
     render_finances_tab,
@@ -107,7 +108,7 @@ def _avatar_html(user: dict, size: int = 38) -> str:
 def main_page():
     user_id = app.storage.user.get("user_id")
     if not user_id:
-        ui.navigate.to("/login")
+        ui.navigate.to("/select-user")
         return
 
     ui.add_head_html(f"<style>{_page_style()}</style>")
@@ -309,8 +310,8 @@ async function reactToPost(postId, emoji, userId) {
                         ui.separator()
                     ui.menu_item("Einstellungen", on_click=lambda: ui.navigate.to("/settings"))
                     ui.menu_item(
-                        "Abmelden",
-                        on_click=lambda: (app.storage.user.pop("user_id", None), ui.navigate.to("/login")),
+                        "Nutzer wechseln",
+                        on_click=lambda: (app.storage.user.pop("user_id", None), ui.navigate.to("/select-user")),
                     )
                 avatar.on("click", user_menu.open)
 
@@ -357,6 +358,7 @@ async function reactToPost(postId, emoji, userId) {
 
 
 # Register auth + settings pages (must be called at module level)
+register_select_user_page()
 register_login_page()
 register_register_page()
 register_forgot_password_page()

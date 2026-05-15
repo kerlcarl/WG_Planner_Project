@@ -2,7 +2,8 @@ import os
 
 from nicegui import app, ui
 
-from auth_services import change_password, get_user_by_id, save_avatar, update_profile, validate_password
+from auth_services import get_user_by_id, save_avatar
+from services import save_user_edit
 
 _CARD_STYLE = (
     "border-radius: 16px; padding: 28px 32px; width: 100%; max-width: 520px; "
@@ -16,14 +17,8 @@ def _section(title: str):
     ui.label(title).classes("text-subtitle1 font-bold").style("color: #312e81; margin-bottom: 14px")
 
 
-def _input(label: str, value: str = "", type_: str = "text") -> ui.input:
-    is_pw = type_ == "password"
-    return ui.input(
-        label=label,
-        value=value,
-        password=is_pw,
-        password_toggle_button=is_pw,
-    ).props(f"type={type_} outlined dense" if not is_pw else "outlined dense").classes("w-full")
+def _input(label: str, value: str = "") -> ui.input:
+    return ui.input(label=label, value=value).props("outlined dense").classes("w-full")
 
 
 def _err() -> ui.label:
@@ -54,7 +49,7 @@ def register_settings_page():
     def settings_page():
         user_id = app.storage.user.get("user_id")
         if not user_id:
-            ui.navigate.to("/login")
+            ui.navigate.to("/select-user")
             return
 
         ui.add_head_html("""<style>
@@ -67,7 +62,6 @@ body {
 }
 </style>""")
 
-        # ── header ─────────────────────────────────────────────────────────────
         with ui.header().classes("p-4").style(
             "background: linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4338ca 80%,#6366f1 100%); "
             "box-shadow: 0 4px 32px rgba(30,27,75,0.40);"
@@ -91,7 +85,7 @@ body {
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-            # ── Profile ────────────────────────────────────────────────────────
+            # ── Profildaten ────────────────────────────────────────────────────
             with ui.card().style(_CARD_STYLE):
                 _section("Profildaten")
 
@@ -100,26 +94,28 @@ body {
                 with ui.row().classes("w-full gap-3"):
                     first_in = _input("Vorname", first_name).classes("flex-1")
                     last_in = _input("Nachname", last_name).classes("flex-1")
-                email_in = _input("E-Mail", user["email"] or "", "email")
                 profile_err = _err()
                 profile_ok = _success()
 
                 def save_profile():
                     profile_err.set_text("")
                     profile_ok.set_text("")
-                    err = update_profile(user_id, first_in.value, last_in.value, email_in.value)
-                    if err:
-                        profile_err.set_text(err)
-                    else:
-                        profile_ok.set_text("Gespeichert ✓")
-                        avatar_html.set_content(_avatar_html(get_user_by_id(user_id), 72))
-                        ui.notify("Profil aktualisiert", color="positive")
+                    first = first_in.value.strip()
+                    last = last_in.value.strip()
+                    if not first:
+                        profile_err.set_text("Vorname ist ein Pflichtfeld")
+                        return
+                    new_name = f"{first} {last}".strip()
+                    save_user_edit(user_id, new_name)
+                    profile_ok.set_text("Gespeichert ✓")
+                    avatar_html.set_content(_avatar_html(get_user_by_id(user_id), 72))
+                    ui.notify("Profil aktualisiert", color="positive")
 
                 ui.button("Speichern", on_click=save_profile).props("no-caps unelevated").style(
                     "background: #312e81; color: white; border-radius: 8px; margin-top: 6px"
                 )
 
-            # ── Avatar upload ──────────────────────────────────────────────────
+            # ── Profilbild ─────────────────────────────────────────────────────
             with ui.card().style(_CARD_STYLE):
                 _section("Profilbild")
                 ui.label("Lade ein Bild hoch (JPG/PNG, max. 2 MB).").style(
@@ -142,71 +138,10 @@ body {
                     max_file_size=2_000_000,
                 ).props("accept=image/*").classes("w-full")
 
-            # ── Password ───────────────────────────────────────────────────────
-            with ui.card().style(_CARD_STYLE):
-                _section("Passwort ändern")
-
-                pw_vals = {"cur": "", "new": "", "new2": ""}
-
-                cur_pw = ui.input(
-                    label="Aktuelles Passwort", password=True, password_toggle_button=True,
-                    on_change=lambda e: pw_vals.update(cur=e.value),
-                ).props("outlined dense").classes("w-full")
-
-                new_pw_err = _err()
-
-                def _on_new_pw(e):
-                    pw_vals["new"] = e.value
-                    err = validate_password(e.value) if e.value else None
-                    new_pw_err.set_text(err or "")
-
-                new_pw = ui.input(
-                    label="Neues Passwort", password=True, password_toggle_button=True,
-                    on_change=_on_new_pw,
-                ).props("outlined dense").classes("w-full")
-
-                new_pw2_err = _err()
-
-                def _on_new_pw2(e):
-                    pw_vals["new2"] = e.value
-                    if e.value and e.value != pw_vals["new"]:
-                        new_pw2_err.set_text("Passwörter stimmen nicht überein")
-                    else:
-                        new_pw2_err.set_text("")
-
-                new_pw2 = ui.input(
-                    label="Neues Passwort bestätigen", password=True, password_toggle_button=True,
-                    on_change=_on_new_pw2,
-                ).props("outlined dense").classes("w-full")
-
-                pw_err = _err()
-                pw_ok = _success()
-
-                def save_pw():
-                    pw_err.set_text("")
-                    pw_ok.set_text("")
-                    new_pw2_err.set_text("")
-                    if pw_vals["new"] != pw_vals["new2"]:
-                        new_pw2_err.set_text("Passwörter stimmen nicht überein")
-                        return
-                    err = change_password(user_id, pw_vals["cur"], pw_vals["new"])
-                    if err:
-                        pw_err.set_text(err)
-                    else:
-                        pw_ok.set_text("Passwort geändert ✓")
-                        pw_vals.update(cur="", new="", new2="")
-                        cur_pw.value = new_pw.value = new_pw2.value = ""
-                        ui.notify("Passwort erfolgreich geändert", color="positive")
-
-                ui.button("Passwort ändern", on_click=save_pw).props("no-caps unelevated").style(
-                    "background: #312e81; color: white; border-radius: 8px; margin-top: 6px"
-                )
-
-            # ── Logout ─────────────────────────────────────────────────────────
-            ui.button("Abmelden", icon="logout", on_click=lambda: _logout()).props(
-                "no-caps outline"
-            ).style("color: #dc2626; border-color: #dc2626; border-radius: 8px; margin-top: 8px")
-
-        def _logout():
-            app.storage.user.pop("user_id", None)
-            ui.navigate.to("/login")
+            # ── Nutzer wechseln ────────────────────────────────────────────────
+            ui.button("Nutzer wechseln", icon="swap_horiz", on_click=lambda: (
+                app.storage.user.pop("user_id", None),
+                ui.navigate.to("/select-user"),
+            )).props("no-caps outline").style(
+                "color: #6366f1; border-color: #6366f1; border-radius: 8px; margin-top: 8px"
+            )
