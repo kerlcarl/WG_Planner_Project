@@ -104,6 +104,25 @@ def save_expense(desc: str, amt: float, cat: str, payer_id: int, participant_ids
         session.commit()
 
 
+def update_expense(expense_id: int, desc: str, amt: float, cat: str, payer_id: int, participant_ids: list[int]) -> None:
+    if len(participant_ids) < 2:
+        raise ValueError("Es müssen mindestens 2 Personen an einer Ausgabe beteiligt sein.")
+    with get_session() as session:
+        expense = session.get(Expense, expense_id)
+        if not expense:
+            raise ValueError("Ausgabe nicht gefunden.")
+        expense.description = desc
+        expense.amount = amt
+        expense.category = cat
+        expense.paid_by_id = payer_id
+        expense.participants.clear()
+        for uid in participant_ids:
+            user = session.get(MitbewohnerDB, uid)
+            if user:
+                expense.participants.append(user)
+        session.commit()
+
+
 def delete_expense(expense_id: int) -> None:
     with get_session() as session:
         expense = session.get(Expense, expense_id)
@@ -194,6 +213,35 @@ def update_task_status(task_id: int, value: bool) -> None:
         task = session.get(Task, task_id)
         if task:
             task.is_done = value
+            session.commit()
+
+
+def update_task(task_id: int, title_val: str, who_id, due_date_str: str) -> str | None:
+    """Aktualisiert ein bestehendes Ämtli. Gibt eine Fehlermeldung zurück oder None bei Erfolg."""
+    if not title_val or not title_val.strip():
+        return "Titel darf nicht leer sein"
+    due_date = None
+    if due_date_str:
+        try:
+            due_date = datetime.strptime(due_date_str, "%d.%m.%Y")
+        except ValueError:
+            return "Ungültiges Datum – bitte TT.MM.JJJJ verwenden"
+    with get_session() as session:
+        task = session.get(Task, task_id)
+        if not task:
+            return "Ämtli nicht gefunden"
+        task.title = title_val.strip()
+        task.assigned_to_id = who_id
+        task.due_date = due_date
+        session.commit()
+    return None
+
+
+def delete_task(task_id: int) -> None:
+    with get_session() as session:
+        task = session.get(Task, task_id)
+        if task:
+            session.delete(task)
             session.commit()
 
 

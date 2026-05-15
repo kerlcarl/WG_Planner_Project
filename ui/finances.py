@@ -12,6 +12,7 @@ from services import (
     get_session,
     save_expense,
     save_settlement,
+    update_expense,
 )
 
 _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
@@ -183,6 +184,111 @@ def render_finances_tab(container, current_user_id: int = None):
                     with ui.row().classes("w-full justify-end gap-2 pt-2"):
                         ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), expense_dialog.close())).props("flat")
                         save_btn = ui.button("Speichern", on_click=handle_save).classes("bg-green-600 text-white").props("disabled")
+
+            # ── Ausgabe-Bearbeiten-Dialog ─────────────────────────────────────
+            _edit_id = {"value": None}
+
+            with ui.dialog().props("persistent") as edit_dialog, ui.card().classes(
+                "w-[42rem] max-w-[95vw] rounded-2xl shadow-xl"
+            ):
+                with ui.row().classes("w-full items-center justify-between p-5 pb-2"):
+                    with ui.column().classes("gap-0"):
+                        ui.label("Ausgabe bearbeiten").classes("text-h6 font-bold text-slate-900")
+                        ui.label("Bestehende Ausgabe anpassen.").classes("text-sm text-slate-500")
+                    ui.button(icon="close", on_click=lambda: (_dialog_open.update(value=False), edit_dialog.close())).props("flat round")
+
+                with ui.column().classes("w-full gap-4 px-5 pb-5 pt-3"):
+                    edit_desc = ui.input("Beschreibung").classes("w-full")
+                    with ui.row().classes("w-full gap-4"):
+                        edit_amt = ui.number("Betrag (CHF)", format="%.2f").classes("w-full")
+                        edit_cat_select = ui.select(
+                            options=DEFAULT_EXPENSE_CATEGORIES + ["Andere..."],
+                            label="Kategorie",
+                            value="Lebensmittel",
+                        ).classes("w-full")
+
+                    edit_custom_cat = ui.input("Eigene Kategorie").classes("w-full")
+                    edit_custom_cat.bind_visibility_from(edit_cat_select, "value", lambda v: v == "Andere...")
+
+                    with ui.card().classes("w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"):
+                        with ui.column().classes("w-full gap-3 p-4"):
+                            ui.label("Bezahlt von").classes("text-sm font-medium text-slate-700")
+                            edit_payer = ui.radio({user.id: user.name for user in users}, value=current_user_id).classes("w-full")
+
+                    with ui.card().classes("w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"):
+                        with ui.column().classes("w-full gap-3 p-4"):
+                            ui.label("Beteiligte Mitbewohner*innen").classes("text-sm font-medium text-slate-700")
+                            with ui.column().classes("gap-2"):
+                                edit_part_cbs = {}
+                                for user in users:
+                                    cb = ui.checkbox(user.name, on_change=lambda e: _check_edit_parts())
+                                    edit_part_cbs[user.id] = cb
+                            ui.label("Mindestens 2 Personen erforderlich").classes("text-xs text-slate-400 mt-1")
+                            edit_parts_err = ui.label("").classes("text-xs text-red-500 mt-1")
+
+                    class _EditPartsGroup:
+                        @property
+                        def value(self):
+                            return [uid for uid, cb in edit_part_cbs.items() if cb.value]
+
+                    edit_parts = _EditPartsGroup()
+
+                    class _EditCategoryField:
+                        @property
+                        def value(self):
+                            if edit_cat_select.value == "Andere...":
+                                return edit_custom_cat.value.strip()
+                            return edit_cat_select.value
+
+                    edit_category_field = _EditCategoryField()
+
+                    def _check_edit_parts():
+                        if len(edit_parts.value) < 2:
+                            edit_parts_err.set_text("Es müssen mindestens 2 Personen beteiligt sein.")
+                            edit_save_btn.props("disabled")
+                        else:
+                            edit_parts_err.set_text("")
+                            edit_save_btn.props(remove="disabled")
+
+                    def handle_edit_save():
+                        if not edit_desc.value or not edit_amt.value or not edit_payer.value or not edit_category_field.value:
+                            ui.notify("Bitte alle Pflichtfelder ausfüllen", color="warning")
+                            return
+                        if len(edit_parts.value) < 2:
+                            edit_parts_err.set_text("Es müssen mindestens 2 Personen an einer Ausgabe beteiligt sein.")
+                            ui.notify("Mindestens 2 Personen erforderlich", color="warning")
+                            return
+                        try:
+                            update_expense(_edit_id["value"], edit_desc.value, edit_amt.value, edit_category_field.value, edit_payer.value, edit_parts.value)
+                        except ValueError as e:
+                            ui.notify(str(e), color="warning")
+                            return
+                        ui.notify("Ausgabe aktualisiert", color="positive")
+                        _dialog_open["value"] = False
+                        edit_dialog.close()
+                        refresh()
+
+                    with ui.row().classes("w-full justify-end gap-2 pt-2"):
+                        ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), edit_dialog.close())).props("flat")
+                        edit_save_btn = ui.button("Speichern", on_click=handle_edit_save).classes("bg-green-600 text-white").props("disabled")
+
+            def _open_edit_dialog(expense):
+                _edit_id["value"] = expense.id
+                edit_desc.value = expense.description
+                edit_amt.value = expense.amount
+                # Category
+                if expense.category in DEFAULT_EXPENSE_CATEGORIES:
+                    edit_cat_select.value = expense.category
+                else:
+                    edit_cat_select.value = "Andere..."
+                    edit_custom_cat.value = expense.category or ""
+                edit_payer.value = expense.paid_by_id
+                participant_ids = {p.id for p in expense.participants}
+                for uid, cb in edit_part_cbs.items():
+                    cb.value = uid in participant_ids
+                _check_edit_parts()
+                _dialog_open["value"] = True
+                edit_dialog.open()
 
             # ── 3-Spalten-Layout ──────────────────────────────────────────────
             with ui.element("div").classes("wg-grid-3"):
@@ -528,14 +634,19 @@ def render_finances_tab(container, current_user_id: int = None):
                                             ui.label(
                                                 f"von {expense.paid_by.name if expense.paid_by else 'Unbekannt'}"
                                             ).classes("text-xs text-gray-400")
-                                        ui.button(
-                                            icon="delete",
-                                            on_click=lambda e=expense: (
-                                                delete_expense(e.id),
-                                                ui.notify("Ausgabe gelöscht", color="negative"),
-                                                refresh(),
-                                            ),
-                                        ).props("flat round color=red")
+                                        with ui.row().classes("gap-0"):
+                                            ui.button(
+                                                icon="edit",
+                                                on_click=lambda e=expense: _open_edit_dialog(e),
+                                            ).props("flat round color=indigo")
+                                            ui.button(
+                                                icon="delete",
+                                                on_click=lambda e=expense: (
+                                                    delete_expense(e.id),
+                                                    ui.notify("Ausgabe gelöscht", color="negative"),
+                                                    refresh(),
+                                                ),
+                                            ).props("flat round color=red")
                                     ui.separator().classes("mx-3")
                                     ui.label(
                                         f"Beteiligt: {', '.join(p.name for p in expense.participants)}"
