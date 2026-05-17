@@ -23,7 +23,7 @@ def render_tasks_tab(container, current_user_id: int = None):
             tasks = session.query(Task).options(joinedload(Task.assigned_to)).all()
             users = session.query(MitbewohnerDB).all()
         # Nur Aufgaben mit Deadline im Kalender markieren.
-        event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date]
+        event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done]
         open_tasks = [t for t in tasks if not t.is_done]
         done_tasks = [t for t in tasks if t.is_done]
         tasks_with_deadline = sorted(
