@@ -270,7 +270,7 @@ def delete_task(task_id: int) -> None:
 def add_user(name: str) -> None:
     with get_session() as session:
         used = {u.color for u in session.query(MitbewohnerDB).all()}
-        color = next((c for c in USER_PALETTE if c not in used), USER_PALETTE[0])
+        color = next((c for c in USER_PALETTE if c not in used), USER_PALETTE[len(used) % len(USER_PALETTE)])
         session.add(MitbewohnerDB(name=name, color=color))
         session.commit()
 
