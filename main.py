@@ -82,11 +82,12 @@ body {
 @media (max-width: 1200px) {
   .wg-grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 1000px) {
-  .wg-collab-grid { grid-template-columns: 1fr !important; }
+@media (max-width: 1200px) {
+  .wg-collab-grid { grid-template-columns: 1fr 1fr !important; }
 }
 @media (max-width: 800px) {
   .wg-grid-3, .wg-grid-2, .wg-cards-2 { grid-template-columns: 1fr; }
+  .wg-collab-grid { grid-template-columns: 1fr !important; }
 }
 """
 
