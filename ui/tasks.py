@@ -96,7 +96,9 @@ def render_tasks_tab(container, current_user_id: int = None):
 
                     with ui.input("Deadline (optional)", placeholder="TT.MM.JJJJ") as edit_deadline:
                         with ui.menu().props("no-parent-event") as edit_deadline_menu:
-                            with ui.date().props('mask="DD.MM.YYYY"').bind_value(edit_deadline):
+                            with ui.date().props(
+                                f'mask="DD.MM.YYYY" :options="d => d >= \'{today_str}\'"'
+                            ).bind_value(edit_deadline):
                                 with ui.row().classes("justify-end"):
                                     ui.button("OK", on_click=edit_deadline_menu.close).props("flat dense")
                         with edit_deadline.add_slot("append"):
@@ -159,7 +161,9 @@ def render_tasks_tab(container, current_user_id: int = None):
 
                         with ui.input("Deadline (optional)", placeholder="TT.MM.JJJJ") as deadline:
                             with ui.menu().props("no-parent-event") as deadline_menu:
-                                with ui.date().props('mask="DD.MM.YYYY"').bind_value(deadline):
+                                with ui.date().props(
+                                    f'mask="DD.MM.YYYY" :options="d => d >= \'{today_str}\'"'
+                                ).bind_value(deadline):
                                     with ui.row().classes("justify-end"):
                                         ui.button("OK", on_click=deadline_menu.close).props("flat dense")
                             with deadline.add_slot("append"):
