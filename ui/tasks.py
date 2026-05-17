@@ -24,8 +24,15 @@ def render_tasks_tab(container, current_user_id: int = None):
             users = session.query(MitbewohnerDB).all()
         # Nur Aufgaben mit Deadline im Kalender markieren.
         event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done]
-        open_tasks = [t for t in tasks if not t.is_done]
-        done_tasks = [t for t in tasks if t.is_done]
+        # Sortierung: Aufgaben mit Deadline zuerst (aufsteigend), danach ohne Datum
+        open_tasks = sorted(
+            [t for t in tasks if not t.is_done],
+            key=lambda t: (t.due_date is None, t.due_date),
+        )
+        done_tasks = sorted(
+            [t for t in tasks if t.is_done],
+            key=lambda t: (t.due_date is None, t.due_date),
+        )
         tasks_with_deadline = sorted(
             [t for t in tasks if t.due_date and not t.is_done],
             key=lambda t: t.due_date,
@@ -35,9 +42,13 @@ def render_tasks_tab(container, current_user_id: int = None):
         today_str = now.strftime("%Y/%m/%d")
         datum_label = f"{_WOCHENTAGE[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
         uhrzeit_label = now.strftime("%H:%M")
+        # Tooltip-Inhalt: Titel + Zuständige*r für jeden Tag
         task_map = {}
         for t in tasks_with_deadline:
-            task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(t.title)
+            assigned = t.assigned_to.name if t.assigned_to else "–"
+            task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(
+                f"{t.title} ({assigned})"
+            )
 
         with container:
             # Hero-Banner
