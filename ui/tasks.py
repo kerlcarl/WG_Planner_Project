@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from nicegui import ui
 from sqlalchemy.orm import joinedload
@@ -29,6 +30,14 @@ def render_tasks_tab(container, current_user_id: int = None):
             [t for t in tasks if t.due_date and not t.is_done],
             key=lambda t: t.due_date,
         )
+        _WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+        now = datetime.now()
+        today_str = now.strftime("%Y/%m/%d")
+        datum_label = f"{_WOCHENTAGE[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
+        uhrzeit_label = now.strftime("%H:%M")
+        task_map = {}
+        for t in tasks_with_deadline:
+            task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(t.title)
 
         with container:
             # Hero-Banner
@@ -176,50 +185,31 @@ def render_tasks_tab(container, current_user_id: int = None):
                 # ── Spalte 2: Kalender ───────────────────────────────────────
                 with ui.element("div"):
                     with ui.card().classes("w-full shadow-md rounded-xl bg-white"):
-                        with ui.row().classes("items-center gap-2 px-4 pt-4 pb-2"):
-                            ui.icon("calendar_month").style("color: #f97316; font-size: 1.3rem")
-                            with ui.column().classes("gap-0"):
-                                ui.label("Ämtli-Kalender").style(
-                                    "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
-                                )
-                                ui.label("Orange markierte Tage haben eine Deadline").style(
-                                    "font-size: 0.78rem; color: #94a3b8"
-                                )
-                        with ui.element("div").classes("px-4 pb-2"):
-                            ui.date().props(f':events=\'{json.dumps(event_days)}\' event-color="orange"').classes("w-full")
-
-                        if tasks_with_deadline:
-                            with ui.element("div").classes("px-4 pb-4"):
-                                ui.separator().classes("my-2")
-                                with ui.row().classes("items-center gap-2 mb-2"):
-                                    ui.icon("schedule").style("color: #f97316; font-size: 1rem")
-                                    ui.label("Anstehende Deadlines").style(
-                                        "font-size: 0.9rem; font-weight: 700; color: #9a3412"
+                        with ui.row().classes(
+                            "w-full items-center justify-between px-4 pt-4 pb-1 flex-wrap gap-2"
+                        ):
+                            with ui.row().classes("items-center gap-2"):
+                                ui.icon("calendar_month").style("color: #f97316; font-size: 1.3rem")
+                                with ui.column().classes("gap-0"):
+                                    ui.label("Ämtli-Kalender").style(
+                                        "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
                                     )
-                                for t in tasks_with_deadline:
-                                    assigned = t.assigned_to.name if t.assigned_to else "–"
-                                    deadline_str = t.due_date.strftime("%d.%m.%Y")
-                                    with ui.row().classes("items-center gap-2 py-1 flex-wrap"):
-                                        ui.icon("event").style(
-                                            "color: #f97316; font-size: 1rem; flex-shrink: 0"
-                                        )
-                                        ui.label(deadline_str).style(
-                                            "font-weight: 700; color: #9a3412; font-size: 0.85rem; "
-                                            "min-width: 80px"
-                                        )
-                                        ui.label("·").style("color: #fdba74")
-                                        ui.label(assigned).style(
-                                            "font-weight: 600; color: #1e1b4b; font-size: 0.85rem"
-                                        )
-                                        ui.label("–").style("color: #94a3b8")
-                                        ui.label(t.title).style(
-                                            "color: #374151; font-size: 0.85rem"
-                                        )
-                        else:
-                            with ui.element("div").classes("px-4 pb-4"):
-                                ui.label("Keine offenen Deadlines").style(
-                                    "color: #94a3b8; font-size: 0.8rem; font-style: italic"
+                                    ui.label("🟠 Deadline · Grau = vergangen · Hover für Details").style(
+                                        "font-size: 0.73rem; color: #94a3b8"
+                                    )
+                            with ui.column().classes("items-end gap-0"):
+                                ui.label(datum_label).style(
+                                    "font-size: 0.88rem; font-weight: 700; color: #9a3412"
                                 )
+                                ui.label(uhrzeit_label).style(
+                                    "font-size: 1.1rem; font-weight: 800; color: #f97316"
+                                )
+                        with ui.element("div").classes("px-4 pb-4"):
+                            ui.date().props(
+                                f':events=\'{json.dumps(event_days)}\' '
+                                f'event-color="orange" '
+                                f':options="d => d >= \'{today_str}\'"'
+                            ).classes("w-full wg-tasks-calendar")
 
                 # ── Spalte 3: Aufgabenliste ──────────────────────────────────
                 with ui.element("div"):
@@ -311,6 +301,19 @@ def render_tasks_tab(container, current_user_id: int = None):
                             )
                         for task in done_tasks:
                             _render_task_card(task, True)
+
+        # Hover-Tooltips für Kalender-Tage mit Deadline
+        _tm = json.dumps(task_map)
+        ui.run_javascript(f'''(function(){{
+  var TM={_tm};
+  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'ärz':3,'März':3,'April':4,'Mai':5,'Juni':6,'Juli':7,'August':8,'September':9,'Oktober':10,'November':11,'Dezember':12}};
+  var tip=document.getElementById('_wgTip');
+  if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:240px;';document.body.appendChild(tip);}}
+  function getYM(){{var s=document.querySelectorAll('.wg-tasks-calendar .q-date__navigation-subtitle span');if(s.length<2)return null;var m=MO[s[0].textContent.trim()];var y=parseInt(s[1].textContent.trim());return(m&&!isNaN(y))?{{y:y,m:m}}:null;}}
+  function attach(){{var ym=getYM();if(!ym)return;var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{var btn=item.querySelector('button');if(!btn||btn.dataset.wgT)return;var sp=btn.querySelector('span.block');if(!sp)return;var d=parseInt(sp.textContent.trim());if(isNaN(d))return;var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');var tasks=TM[ds];if(!tasks||!tasks.length)return;btn.dataset.wgT='1';btn.addEventListener('mouseenter',function(e){{tip.innerHTML='📅 <b>'+ds.split('/').reverse().join('.')+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});btn.addEventListener('mousemove',function(e){{tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});btn.addEventListener('mouseleave',function(){{tip.style.display='none';}});}});}}
+  setTimeout(attach,400);
+  var el=document.querySelector('.wg-tasks-calendar');if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,250);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
+}})();''')
 
     refresh()
     return refresh
