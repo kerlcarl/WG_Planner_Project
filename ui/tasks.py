@@ -354,6 +354,7 @@ def render_tasks_tab(container, current_user_id: int = None):
   var TM={_tm};
   var CM={_cm};
   var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'Mai':5,'Juni':6,'Juli':7,'Oktober':10,'Dezember':12}};
+  if(!document.getElementById('_wgCalCSS')){{var s=document.createElement('style');s.id='_wgCalCSS';s.textContent='.wg-tasks-calendar .q-date__event{{display:none!important;}}';document.head.appendChild(s);}}
   var tip=document.getElementById('_wgTip');
   if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:260px;';document.body.appendChild(tip);}}
   function getYM(){{var s=document.querySelectorAll('.wg-tasks-calendar .q-date__navigation-subtitle span');if(s.length<2)return null;var m=MO[s[0].textContent.trim()]||parseInt(s[0].textContent.trim());var y=parseInt(s[1].textContent.trim());return(m&&!isNaN(y))?{{y:y,m:m}}:null;}}
@@ -362,7 +363,6 @@ def render_tasks_tab(container, current_user_id: int = None):
     var ym=getYM();if(!ym)return;
     var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;
     ensurePanel();
-    cal.querySelectorAll('.q-date__event').forEach(function(el){{el.style.display='none';}});
     cal.querySelectorAll('.wg-dots').forEach(function(el){{el.remove();}});
     cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{
       var btn=item.querySelector('button');if(!btn)return;
