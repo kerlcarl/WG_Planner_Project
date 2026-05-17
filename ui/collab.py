@@ -64,10 +64,12 @@ def render_collab_tab(container):
                             "color: rgba(255,255,255,0.72); font-size: 0.85rem; margin-top: 4px"
                         )
 
-            # 3-Spalten-Layout
-            with ui.element("div").classes("wg-grid-3"):
+            # 2-Spalten-Layout: Blog links (breit), Einkaufsliste rechts (schmal)
+            with ui.element("div").style(
+                "display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start"
+            ).classes("wg-collab-grid"):
 
-                # ── Spalte 1: Blog-Formular ───────────────────────────────────
+                # ── Spalte 1: Blog (Formular + Feed) ─────────────────────────
                 with ui.element("div"):
                     with ui.row().classes("items-center gap-3 mb-4"):
                         with ui.element("div").style(
@@ -83,7 +85,7 @@ def render_collab_tab(container):
                                 "font-size: 0.78rem; color: #94a3b8"
                             )
 
-                    with ui.card().classes("w-full").style(
+                    with ui.card().classes("w-full mb-4").style(
                         "border-radius: 18px; border: 1.5px solid #ede9fe; "
                         "box-shadow: 0 4px 16px rgba(124,58,237,0.07); padding: 20px"
                     ):
@@ -94,7 +96,7 @@ def render_collab_tab(container):
                             )
                         blog_content = ui.textarea(
                             "Inhalt", placeholder="Was möchtest du der WG mitteilen?"
-                        ).classes("w-full mt-2").props("rows=4 outlined")
+                        ).classes("w-full mt-2").props("rows=3 outlined")
                         blog_important = ui.checkbox("Als wichtig markieren").classes("mt-1")
                         blog_important.style("color: #dc2626")
                         ui.button(
@@ -104,16 +106,14 @@ def render_collab_tab(container):
                             "border-radius: 10px; font-weight: 600"
                         )
 
-                # ── Spalte 2: Blog-Feed ───────────────────────────────────────
-                with ui.element("div"):
-                    with ui.row().classes("items-center gap-2 mb-4"):
+                    with ui.row().classes("items-center gap-2 mb-3"):
                         ui.icon("forum").style("color: #7c3aed; font-size: 1.2rem")
                         ui.label("Nachrichten").style(
                             "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
                         )
                     blog_feed = ui.column().classes("w-full")
 
-                # ── Spalte 3: Einkaufsliste ───────────────────────────────────
+                # ── Spalte 2: Einkaufsliste ───────────────────────────────────
                 with ui.element("div"):
                     with ui.row().classes("items-center justify-between mb-4 gap-2"):
                         with ui.row().classes("items-center gap-3"):
