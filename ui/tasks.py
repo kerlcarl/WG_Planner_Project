@@ -23,7 +23,9 @@ def render_tasks_tab(container, current_user_id: int = None):
             tasks = session.query(Task).options(joinedload(Task.assigned_to)).all()
             users = session.query(MitbewohnerDB).all()
         # Nur Aufgaben mit Deadline im Kalender markieren.
-        event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done]
+        event_days = list(dict.fromkeys(
+            task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done
+        ))
         # Sortierung: Aufgaben mit Deadline zuerst (aufsteigend), danach ohne Datum
         open_tasks = sorted(
             [t for t in tasks if not t.is_done],
@@ -63,6 +65,18 @@ def render_tasks_tab(container, current_user_id: int = None):
             color_map.setdefault(day_str, []).append(
                 user_color.get(uid, "#f97316") if uid else "#f97316"
             )
+        # Quasar event-color nutzt bg-{name}-Klassen, keine Hex-Werte.
+        # Daher eigene CSS-Klassen definieren und diese als Farbnamen übergeben.
+        _css_rules = " ".join(
+            f".bg-wg-uc-{u.id}{{background:{u.color or '#336699'}!important;}}"
+            for u in users
+        )
+        date_to_class: dict[str, str] = {}
+        for t in tasks_with_deadline:
+            day_str = t.due_date.strftime("%Y/%m/%d")
+            if day_str not in date_to_class:
+                uid = t.assigned_to_id
+                date_to_class[day_str] = f"wg-uc-{uid}" if uid else "orange"
 
         with container:
             # Hero-Banner
@@ -234,9 +248,10 @@ def render_tasks_tab(container, current_user_id: int = None):
                                     "font-size: 1.1rem; font-weight: 800; color: #f97316"
                                 )
                         with ui.element("div").classes("px-4 pb-4"):
+                            _dtc = json.dumps(date_to_class, separators=(',', ':'))
                             ui.date().props(
                                 f':events=\'{json.dumps(event_days)}\' '
-                                f'event-color="orange" '
+                                f':event-color=\'(d) => ({_dtc})[d] || "orange"\' '
                                 f':options="d => d >= \'{today_str}\'"'
                             ).classes("w-full wg-tasks-calendar")
                         # Farblegende: wer hat welche Farbe
@@ -352,11 +367,11 @@ def render_tasks_tab(container, current_user_id: int = None):
         _cm = json.dumps(color_map)
         _init_ym = json.dumps({"y": now.year, "m": now.month})
         ui.run_javascript(f"""(function(){{
+  var s=document.getElementById('_wgUserColors');if(!s){{s=document.createElement('style');s.id='_wgUserColors';document.head.appendChild(s);}}s.textContent='{_css_rules}';
   var TM={_tm};
   var CM={_cm};
   var INIT_YM={_init_ym};
   var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'April':4,'Mai':5,'Juni':6,'Juli':7,'August':8,'September':9,'Oktober':10,'November':11,'Dezember':12}};
-  if(!document.getElementById('_wgCalCSS')){{var cs=document.createElement('style');cs.id='_wgCalCSS';cs.textContent='.wg-tasks-calendar .q-date__event{{display:none!important;}}';document.head.appendChild(cs);}}
   var tip=document.getElementById('_wgTip');
   if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:260px;';document.body.appendChild(tip);}}
   function getYM(){{
@@ -394,20 +409,12 @@ def render_tasks_tab(container, current_user_id: int = None):
     var ym=getYM()||INIT_YM;
     var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;
     ensurePanel();
-    cal.querySelectorAll('.wg-dots').forEach(function(el){{el.remove();}});
     cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{
       var btn=item.querySelector('button');if(!btn)return;
       var sp=btn.querySelector('span.block');if(!sp)return;
       var d=parseInt(sp.textContent.trim());if(isNaN(d))return;
       var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
       var colors=CM[ds]||[];
-      if(colors.length){{
-        var dd=document.createElement('div');dd.className='wg-dots';
-        dd.style.cssText='position:absolute;bottom:1px;left:50%;transform:translateX(-50%);display:flex;gap:2px;align-items:center;pointer-events:none;z-index:2;';
-        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+c+';flex-shrink:0;display:inline-block;box-shadow:0 0 0 1px rgba(255,255,255,0.6);';dd.appendChild(dot);}});
-        item.style.position='relative';
-        item.appendChild(dd);
-      }}
       if(btn.dataset.wgH)return;btn.dataset.wgH='1';
       var tasks=TM[ds]||[];
       btn.addEventListener('mouseenter',function(e){{if(!tasks.length)return;tip.innerHTML='<b>'+String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
