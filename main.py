@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from auth_services import get_user_by_id
 from models import Task, init_db, seed_db
-from services import get_session
+from services import assign_palette_colors, get_session
 from ui import (
     register_forgot_password_page,
     register_login_page,
@@ -404,6 +404,7 @@ register_settings_page()
 if __name__ in {"__main__", "__mp_main__"}:
     init_db()
     seed_db()
+    assign_palette_colors()
     ui.run(
         title="WG-Planner",
         host="0.0.0.0",

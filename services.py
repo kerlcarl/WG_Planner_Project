@@ -4,6 +4,17 @@ from datetime import datetime
 
 from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Reaction, Session, Task
 
+USER_PALETTE = [
+    "#6366f1",  # indigo
+    "#3b82f6",  # blue
+    "#ef4444",  # red
+    "#10b981",  # emerald
+    "#f59e0b",  # amber
+    "#06b6d4",  # cyan
+    "#ec4899",  # pink
+    "#f97316",  # orange
+]
+
 DEFAULT_EXPENSE_CATEGORIES = [
     "Lebensmittel",
     "Haushalt",
@@ -258,7 +269,22 @@ def delete_task(task_id: int) -> None:
 
 def add_user(name: str) -> None:
     with get_session() as session:
-        session.add(MitbewohnerDB(name=name))
+        used = {u.color for u in session.query(MitbewohnerDB).all()}
+        color = next((c for c in USER_PALETTE if c not in used), USER_PALETTE[0])
+        session.add(MitbewohnerDB(name=name, color=color))
+        session.commit()
+
+
+def assign_palette_colors() -> None:
+    """Weist Nutzern mit der Standard-Farbe automatisch verschiedene Palette-Farben zu."""
+    with get_session() as session:
+        users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.id).all()
+        used: set[str] = set()
+        for u in users:
+            if u.color in ("#336699", None, ""):
+                color = next((c for c in USER_PALETTE if c not in used), USER_PALETTE[len(used) % len(USER_PALETTE)])
+                u.color = color
+            used.add(u.color)
         session.commit()
 
 

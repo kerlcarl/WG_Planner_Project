@@ -3,15 +3,6 @@ from nicegui import ui
 from models import MitbewohnerDB
 from services import add_user, delete_user, get_session, save_user_edit
 
-_AVATAR_PALETTE = [
-    "#6366f1", "#8b5cf6", "#10b981", "#f59e0b",
-    "#ef4444", "#06b6d4", "#ec4899", "#f97316",
-]
-
-
-def _avatar_color(name: str) -> str:
-    return _AVATAR_PALETTE[sum(ord(c) for c in name) % len(_AVATAR_PALETTE)]
-
 
 def _open_edit_dialog(user, on_done) -> None:
     """Öffnet einen Dialog zum Bearbeiten des Mitbewohner-Namens (UI-Schicht)."""
@@ -103,7 +94,7 @@ def render_users_tab(container, on_users_changed=None):
         list_items_container.clear()
         with get_session() as session:
             users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
-            user_data = [{"id": u.id, "name": u.name} for u in users]
+            user_data = [{"id": u.id, "name": u.name, "color": u.color or "#6366f1"} for u in users]
 
         with list_items_container:
             if not user_data:
@@ -120,7 +111,7 @@ def render_users_tab(container, on_users_changed=None):
                     )
             else:
                 for data in user_data:
-                    color = _avatar_color(data["name"])
+                    color = data["color"]
                     with ui.card().classes("w-full").style(
                         f"border-radius: 16px; box-shadow: 0 2px 14px rgba(0,0,0,0.07); "
                         f"border-left: 5px solid {color}; padding: 0; overflow: hidden"
