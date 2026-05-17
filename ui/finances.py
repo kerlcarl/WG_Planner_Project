@@ -1,4 +1,5 @@
 from nicegui import ui
+from sqlalchemy.orm import joinedload, selectinload
 
 from models import Expense, ManualDebt, MitbewohnerDB
 from services import (
@@ -27,15 +28,26 @@ def render_finances_tab(container, current_user_id: int = None):
         if _dialog_open["value"]:
             return
         container.clear()
-        session = get_session()
         # Abgeleitete Werte werden zur Laufzeit berechnet (nicht separat gespeichert).
         balances = calculate_balances()
         category_totals = calculate_category_totals()
         settlements = calculate_settlements()
-        users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
-        expenses = session.query(Expense).order_by(Expense.id.desc()).all()
+        with get_session() as session:
+            users = session.query(MitbewohnerDB).order_by(MitbewohnerDB.name).all()
+            # joinedload/selectinload verhindert DetachedInstanceError nach Session-Close.
+            expenses = (
+                session.query(Expense)
+                .options(joinedload(Expense.paid_by), selectinload(Expense.participants))
+                .order_by(Expense.id.desc())
+                .all()
+            )
+            manual_debts = (
+                session.query(ManualDebt)
+                .options(joinedload(ManualDebt.from_user), joinedload(ManualDebt.to_user))
+                .order_by(ManualDebt.created_at.desc())
+                .all()
+            )
         user_names = {user.id: user.name for user in users}
-        manual_debts = session.query(ManualDebt).order_by(ManualDebt.created_at.desc()).all()
         total_spent = sum(e.amount for e in expenses)
         expense_count = len(expenses)
 
@@ -651,8 +663,6 @@ def render_finances_tab(container, current_user_id: int = None):
                                     ui.label(
                                         f"Beteiligt: {', '.join(p.name for p in expense.participants)}"
                                     ).classes("px-3 pb-3 pt-2 text-xs italic text-gray-500")
-
-        session.close()
 
     refresh()
     return refresh

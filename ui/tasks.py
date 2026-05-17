@@ -1,6 +1,7 @@
 import json
 
 from nicegui import ui
+from sqlalchemy.orm import joinedload
 
 from models import MitbewohnerDB, Task
 from services import delete_task, get_session, save_task, update_task, update_task_status
@@ -16,9 +17,10 @@ def render_tasks_tab(container, current_user_id: int = None):
         if _form_active["value"] or _dialog_open["value"]:
             return
         container.clear()
-        session = get_session()
-        tasks = session.query(Task).all()
-        users = session.query(MitbewohnerDB).all()
+        with get_session() as session:
+            # joinedload verhindert DetachedInstanceError nach Session-Close.
+            tasks = session.query(Task).options(joinedload(Task.assigned_to)).all()
+            users = session.query(MitbewohnerDB).all()
         # Nur Aufgaben mit Deadline im Kalender markieren.
         event_days = [task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date]
         open_tasks = [t for t in tasks if not t.is_done]
@@ -309,8 +311,6 @@ def render_tasks_tab(container, current_user_id: int = None):
                             )
                         for task in done_tasks:
                             _render_task_card(task, True)
-
-        session.close()
 
     refresh()
     return refresh

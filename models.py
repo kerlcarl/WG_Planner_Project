@@ -163,7 +163,11 @@ if DATABASE_URL.startswith('postgres://'):
 
 _is_sqlite = DATABASE_URL.startswith('sqlite')
 _connect_args = {'check_same_thread': False} if _is_sqlite else {}
-engine = create_engine(DATABASE_URL, connect_args=_connect_args)
+_engine_kwargs: dict = dict(connect_args=_connect_args)
+if not _is_sqlite:
+    # Prüft Verbindung vor Wiederverwendung; recycelt nach 4 Minuten (< Render-Timeout).
+    _engine_kwargs.update(pool_pre_ping=True, pool_recycle=240)
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 # Session-Factory fuer DB-Zugriffe in services.py.
 Session = sessionmaker(bind=engine)
 

@@ -1,4 +1,5 @@
 # Anwendungslogik und CRUD-Funktionen – vollständig frei von UI-Abhängigkeiten.
+from contextlib import contextmanager
 from datetime import datetime
 
 from models import EinkaufsItem, Expense, ManualDebt, MitbewohnerDB, Post, Reaction, Session, Task
@@ -15,8 +16,16 @@ DEFAULT_EXPENSE_CATEGORIES = [
 ]
 
 
+@contextmanager
 def get_session():
-    return Session()
+    session = Session()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 # ── Finanzen ───────────────────────────────────────────────────────────────────
