@@ -372,8 +372,9 @@ def render_tasks_tab(container, current_user_id: int = None):
       var colors=CM[ds]||[];
       if(colors.length){{
         var dd=document.createElement('div');dd.className='wg-dots';
-        dd.style.cssText='display:flex;justify-content:center;gap:2px;margin-top:1px;flex-wrap:wrap;';
-        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+c+';display:inline-block;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.2);';dd.appendChild(dot);}});
+        dd.style.cssText='position:absolute;bottom:2px;left:50%;transform:translateX(-50%);display:flex;gap:1px;align-items:center;pointer-events:none;';
+        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:5px;height:5px;border-radius:50%;background:'+c+';flex-shrink:0;display:inline-block;';dd.appendChild(dot);}});
+        btn.style.position='relative';btn.style.overflow='visible';
         btn.appendChild(dd);
       }}
       if(btn.dataset.wgH)return;btn.dataset.wgH='1';
