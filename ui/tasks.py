@@ -44,10 +44,24 @@ def render_tasks_tab(container, current_user_id: int = None):
         uhrzeit_label = now.strftime("%H:%M")
         # Tooltip-Inhalt: Titel + Zuständige*r für jeden Tag
         task_map = {}
+        user_color = {u.id: (u.color or "#336699") for u in users}
         for t in tasks_with_deadline:
             assigned = t.assigned_to.name if t.assigned_to else "–"
             task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(
                 f"{t.title} ({assigned})"
+            )
+        # Farbpunkte: ein Punkt pro eindeutigem Nutzer pro Tag
+        color_map: dict[str, list[str]] = {}
+        _seen_uid: dict[str, set] = {}
+        for t in tasks_with_deadline:
+            day_str = t.due_date.strftime("%Y/%m/%d")
+            uid = t.assigned_to_id
+            _seen_uid.setdefault(day_str, set())
+            if uid in _seen_uid[day_str]:
+                continue
+            _seen_uid[day_str].add(uid)
+            color_map.setdefault(day_str, []).append(
+                user_color.get(uid, "#f97316") if uid else "#f97316"
             )
 
         with container:
@@ -209,7 +223,7 @@ def render_tasks_tab(container, current_user_id: int = None):
                                     ui.label("Ämtli-Kalender").style(
                                         "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
                                     )
-                                    ui.label("🟠 Deadline · Grau = vergangen · Hover für Details").style(
+                                    ui.label("Punkt = Zuständige*r · Grau = vergangen · Hover/Klick").style(
                                         "font-size: 0.73rem; color: #94a3b8"
                                     )
                             with ui.column().classes("items-end gap-0"):
@@ -225,6 +239,22 @@ def render_tasks_tab(container, current_user_id: int = None):
                                 f'event-color="orange" '
                                 f':options="d => d >= \'{today_str}\'"'
                             ).classes("w-full wg-tasks-calendar")
+                        # Farblegende: wer hat welche Farbe
+                        with ui.element("div").classes("px-4 pb-3 pt-2").style(
+                            "border-top: 1px solid #f1f5f9"
+                        ):
+                            with ui.row().classes("items-center gap-4 flex-wrap"):
+                                for u in users:
+                                    _col = u.color or "#336699"
+                                    with ui.row().classes("items-center gap-1"):
+                                        ui.element("div").style(
+                                            f"width:11px;height:11px;border-radius:50%;"
+                                            f"background:{_col};flex-shrink:0;"
+                                            f"box-shadow:0 1px 3px rgba(0,0,0,0.25)"
+                                        )
+                                        ui.label(u.name).style(
+                                            "font-size:0.75rem;color:#475569;font-weight:600"
+                                        )
 
                 # ── Spalte 3: Aufgabenliste ──────────────────────────────────
                 with ui.element("div"):
@@ -317,18 +347,63 @@ def render_tasks_tab(container, current_user_id: int = None):
                         for task in done_tasks:
                             _render_task_card(task, True)
 
-        # Hover-Tooltips für Kalender-Tage mit Deadline
+        # Kalender-Interaktion: farbige Nutzerpunkte, Hover-Tooltip, Klick-Panel
         _tm = json.dumps(task_map)
-        ui.run_javascript(f'''(function(){{
+        _cm = json.dumps(color_map)
+        ui.run_javascript(f"""(function(){{
   var TM={_tm};
-  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'ärz':3,'März':3,'April':4,'Mai':5,'Juni':6,'Juli':7,'August':8,'September':9,'Oktober':10,'November':11,'Dezember':12}};
+  var CM={_cm};
+  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'Mai':5,'Juni':6,'Juli':7,'Oktober':10,'Dezember':12}};
   var tip=document.getElementById('_wgTip');
-  if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:240px;';document.body.appendChild(tip);}}
-  function getYM(){{var s=document.querySelectorAll('.wg-tasks-calendar .q-date__navigation-subtitle span');if(s.length<2)return null;var m=MO[s[0].textContent.trim()];var y=parseInt(s[1].textContent.trim());return(m&&!isNaN(y))?{{y:y,m:m}}:null;}}
-  function attach(){{var ym=getYM();if(!ym)return;var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{var btn=item.querySelector('button');if(!btn||btn.dataset.wgT)return;var sp=btn.querySelector('span.block');if(!sp)return;var d=parseInt(sp.textContent.trim());if(isNaN(d))return;var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');var tasks=TM[ds];if(!tasks||!tasks.length)return;btn.dataset.wgT='1';btn.addEventListener('mouseenter',function(e){{tip.innerHTML='📅 <b>'+ds.split('/').reverse().join('.')+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});btn.addEventListener('mousemove',function(e){{tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});btn.addEventListener('mouseleave',function(){{tip.style.display='none';}});}});}}
+  if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:260px;';document.body.appendChild(tip);}}
+  function getYM(){{var s=document.querySelectorAll('.wg-tasks-calendar .q-date__navigation-subtitle span');if(s.length<2)return null;var m=MO[s[0].textContent.trim()]||parseInt(s[0].textContent.trim());var y=parseInt(s[1].textContent.trim());return(m&&!isNaN(y))?{{y:y,m:m}}:null;}}
+  function ensurePanel(){{var p=document.getElementById('_wgSelPanel');if(!p){{var w=document.querySelector('.wg-tasks-calendar');if(!w)return null;p=document.createElement('div');p.id='_wgSelPanel';p.style.cssText='display:none;background:#fff7ed;border-radius:12px;padding:12px 16px;margin-top:10px;border:2px solid #fed7aa;font-size:0.83rem;line-height:1.8;';w.parentNode.insertBefore(p,w.nextSibling);}}return p;}}
+  function attach(){{
+    var ym=getYM();if(!ym)return;
+    var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;
+    ensurePanel();
+    cal.querySelectorAll('.q-date__event').forEach(function(el){{el.style.display='none';}});
+    cal.querySelectorAll('.wg-dots').forEach(function(el){{el.remove();}});
+    cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{
+      var btn=item.querySelector('button');if(!btn)return;
+      var sp=btn.querySelector('span.block');if(!sp)return;
+      var d=parseInt(sp.textContent.trim());if(isNaN(d))return;
+      var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
+      var colors=CM[ds]||[];
+      if(colors.length){{
+        var dd=document.createElement('div');dd.className='wg-dots';
+        dd.style.cssText='display:flex;justify-content:center;gap:2px;margin-top:1px;flex-wrap:wrap;';
+        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+c+';display:inline-block;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.2);';dd.appendChild(dot);}});
+        btn.appendChild(dd);
+      }}
+      if(btn.dataset.wgH)return;btn.dataset.wgH='1';
+      var tasks=TM[ds]||[];
+      btn.addEventListener('mouseenter',function(e){{if(!tasks.length)return;tip.innerHTML='<b>'+String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
+      btn.addEventListener('mousemove',function(e){{tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
+      btn.addEventListener('mouseleave',function(){{tip.style.display='none';}});
+      btn.addEventListener('click',function(){{
+        tip.style.display='none';if(!tasks.length)return;
+        var panel=document.getElementById('_wgSelPanel');if(!panel)return;
+        document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';b.style.outlineOffset='';}});
+        btn.classList.add('wg-sel');btn.style.outline='2px solid #f97316';btn.style.outlineOffset='2px';
+        var dh=colors.map(function(c){{return '<span style="width:9px;height:9px;border-radius:50%;background:'+c+';display:inline-block;margin-left:4px;vertical-align:middle;"></span>';}}).join('');
+        var dateStr=String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y;
+        panel.innerHTML='<div style="font-weight:700;color:#9a3412;margin-bottom:8px;">'+dateStr+dh+'</div>'+tasks.map(function(t){{return '<div style="padding:2px 0 2px 8px;color:#1e1b4b;border-left:3px solid #f97316;margin-bottom:4px;">'+t+'</div>';}}).join('');
+        panel.style.display='block';
+      }});
+    }});
+    cal.querySelectorAll('.q-date__calendar-item:not(.q-date__calendar-item--event) button').forEach(function(btn){{
+      if(btn.dataset.wgNE)return;btn.dataset.wgNE='1';
+      btn.addEventListener('click',function(){{
+        var panel=document.getElementById('_wgSelPanel');if(panel)panel.style.display='none';
+        document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});
+      }});
+    }});
+  }}
   setTimeout(attach,400);
-  var el=document.querySelector('.wg-tasks-calendar');if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,250);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
-}})();''')
+  var el=document.querySelector('.wg-tasks-calendar');
+  if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{var p=document.getElementById('_wgSelPanel');if(p)p.style.display='none';document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,250);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
+}})();""")
 
     refresh()
     return refresh
