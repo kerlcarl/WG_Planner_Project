@@ -350,17 +350,48 @@ def render_tasks_tab(container, current_user_id: int = None):
         # Kalender-Interaktion: farbige Nutzerpunkte, Hover-Tooltip, Klick-Panel
         _tm = json.dumps(task_map)
         _cm = json.dumps(color_map)
+        _init_ym = json.dumps({"y": now.year, "m": now.month})
         ui.run_javascript(f"""(function(){{
   var TM={_tm};
   var CM={_cm};
-  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'Mai':5,'Juni':6,'Juli':7,'Oktober':10,'Dezember':12}};
-  if(!document.getElementById('_wgCalCSS')){{var s=document.createElement('style');s.id='_wgCalCSS';s.textContent='.wg-tasks-calendar .q-date__event{{display:none!important;}}';document.head.appendChild(s);}}
+  var INIT_YM={_init_ym};
+  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'April':4,'Mai':5,'Juni':6,'Juli':7,'August':8,'September':9,'Oktober':10,'November':11,'Dezember':12}};
+  if(!document.getElementById('_wgCalCSS')){{var cs=document.createElement('style');cs.id='_wgCalCSS';cs.textContent='.wg-tasks-calendar .q-date__event{{display:none!important;}}';document.head.appendChild(cs);}}
   var tip=document.getElementById('_wgTip');
   if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:260px;';document.body.appendChild(tip);}}
-  function getYM(){{var s=document.querySelectorAll('.wg-tasks-calendar .q-date__navigation-subtitle span');if(s.length<2)return null;var m=MO[s[0].textContent.trim()]||parseInt(s[0].textContent.trim());var y=parseInt(s[1].textContent.trim());return(m&&!isNaN(y))?{{y:y,m:m}}:null;}}
+  function getYM(){{
+    var cal=document.querySelector('.wg-tasks-calendar');
+    if(!cal)return null;
+    var y=null,m=null;
+    function scanWords(root){{
+      root.querySelectorAll('button,span,div').forEach(function(el){{
+        if(el.children.length)return;
+        (el.textContent||'').trim().split(/\\s+/).forEach(function(w){{
+          if(!m&&MO[w])m=MO[w];
+          var n=parseInt(w);
+          if(!y&&!isNaN(n)&&n>=2020&&n<=2040)y=n;
+        }});
+      }});
+    }}
+    var nav=cal.querySelector('.q-date__navigation');
+    if(nav)scanWords(nav);
+    if(!m||!y){{
+      var grid=cal.querySelector('.q-date__calendar-days');
+      cal.querySelectorAll('button,span,div').forEach(function(el){{
+        if(grid&&grid.contains(el))return;
+        if(el.children.length)return;
+        (el.textContent||'').trim().split(/\\s+/).forEach(function(w){{
+          if(!m&&MO[w])m=MO[w];
+          var n=parseInt(w);
+          if(!y&&!isNaN(n)&&n>=2020&&n<=2040)y=n;
+        }});
+      }});
+    }}
+    return(m&&y)?{{y:y,m:m}}:null;
+  }}
   function ensurePanel(){{var p=document.getElementById('_wgSelPanel');if(!p){{var w=document.querySelector('.wg-tasks-calendar');if(!w)return null;p=document.createElement('div');p.id='_wgSelPanel';p.style.cssText='display:none;background:#fff7ed;border-radius:12px;padding:12px 16px;margin-top:10px;border:2px solid #fed7aa;font-size:0.83rem;line-height:1.8;';w.parentNode.insertBefore(p,w.nextSibling);}}return p;}}
   function attach(){{
-    var ym=getYM();if(!ym)return;
+    var ym=getYM()||INIT_YM;
     var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;
     ensurePanel();
     cal.querySelectorAll('.wg-dots').forEach(function(el){{el.remove();}});
@@ -372,10 +403,10 @@ def render_tasks_tab(container, current_user_id: int = None):
       var colors=CM[ds]||[];
       if(colors.length){{
         var dd=document.createElement('div');dd.className='wg-dots';
-        dd.style.cssText='position:absolute;bottom:2px;left:50%;transform:translateX(-50%);display:flex;gap:1px;align-items:center;pointer-events:none;';
-        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:5px;height:5px;border-radius:50%;background:'+c+';flex-shrink:0;display:inline-block;';dd.appendChild(dot);}});
-        btn.style.position='relative';btn.style.overflow='visible';
-        btn.appendChild(dd);
+        dd.style.cssText='position:absolute;bottom:1px;left:50%;transform:translateX(-50%);display:flex;gap:2px;align-items:center;pointer-events:none;z-index:2;';
+        colors.forEach(function(c){{var dot=document.createElement('span');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+c+';flex-shrink:0;display:inline-block;box-shadow:0 0 0 1px rgba(255,255,255,0.6);';dd.appendChild(dot);}});
+        item.style.position='relative';
+        item.appendChild(dd);
       }}
       if(btn.dataset.wgH)return;btn.dataset.wgH='1';
       var tasks=TM[ds]||[];
@@ -401,9 +432,9 @@ def render_tasks_tab(container, current_user_id: int = None):
       }});
     }});
   }}
-  setTimeout(attach,400);
+  setTimeout(attach,600);
   var el=document.querySelector('.wg-tasks-calendar');
-  if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{var p=document.getElementById('_wgSelPanel');if(p)p.style.display='none';document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,250);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
+  if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{var p=document.getElementById('_wgSelPanel');if(p)p.style.display='none';document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,350);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
 }})();""")
 
     refresh()
