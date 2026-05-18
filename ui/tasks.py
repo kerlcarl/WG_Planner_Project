@@ -415,6 +415,7 @@ def render_tasks_tab(container, current_user_id: int = None):
       var d=parseInt(sp.textContent.trim());if(isNaN(d))return;
       var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
       var colors=CM[ds]||[];
+      if(colors.length>1&&!item.dataset.wgDots){{item.dataset.wgDots='1';var ed=item.querySelector('.q-date__event');if(ed){{var n=colors.length,gap=6,so=-((n-1)*gap)/2;ed.style.transform='translateX(calc(-50% + '+so+'px))';for(var ci=1;ci<n;ci++){{var xd=document.createElement('div');xd.style.cssText='position:absolute;bottom:4px;width:4px;height:4px;border-radius:50%;left:50%;transform:translateX(calc(-50% + '+(so+ci*gap)+'px));background:'+colors[ci]+';pointer-events:none;border-radius:50%;';item.appendChild(xd);}}}}}}
       if(btn.dataset.wgH)return;btn.dataset.wgH='1';
       var tasks=TM[ds]||[];
       btn.addEventListener('mouseenter',function(e){{if(!tasks.length)return;tip.innerHTML='<b>'+String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
