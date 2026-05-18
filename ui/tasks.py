@@ -7,6 +7,18 @@ from sqlalchemy.orm import joinedload
 from models import MitbewohnerDB, Task
 from services import delete_task, get_session, save_task, update_task, update_task_status
 
+# Muss Quasar-Farbnamen sein – Quasar baut daraus bg-{name} CSS-Klassen
+_HEX_TO_QUASAR = {
+    "#6366f1": "deep-purple",
+    "#3b82f6": "blue",
+    "#ef4444": "red",
+    "#10b981": "green",
+    "#f59e0b": "amber",
+    "#06b6d4": "cyan",
+    "#ec4899": "pink",
+    "#f97316": "orange",
+}
+
 
 # Rendert den Aufgaben-Tab und liefert eine Refresh-Funktion zurueck.
 def render_tasks_tab(container, current_user_id: int = None):
@@ -65,18 +77,13 @@ def render_tasks_tab(container, current_user_id: int = None):
             color_map.setdefault(day_str, []).append(
                 user_color.get(uid, "#f97316") if uid else "#f97316"
             )
-        # Quasar event-color nutzt bg-{name}-Klassen, keine Hex-Werte.
-        # Daher eigene CSS-Klassen definieren und diese als Farbnamen übergeben.
-        _css_rules = " ".join(
-            f".bg-wg-uc-{u.id}{{background:{u.color or '#336699'}!important;}}"
-            for u in users
-        )
         date_to_class: dict[str, str] = {}
         for t in tasks_with_deadline:
             day_str = t.due_date.strftime("%Y/%m/%d")
             if day_str not in date_to_class:
                 uid = t.assigned_to_id
-                date_to_class[day_str] = f"wg-uc-{uid}" if uid else "orange"
+                hex_color = user_color.get(uid, "#f97316") if uid else "#f97316"
+                date_to_class[day_str] = _HEX_TO_QUASAR.get(hex_color, "orange")
 
         with container:
             # Hero-Banner
@@ -367,7 +374,6 @@ def render_tasks_tab(container, current_user_id: int = None):
         _cm = json.dumps(color_map)
         _init_ym = json.dumps({"y": now.year, "m": now.month})
         ui.run_javascript(f"""(function(){{
-  var s=document.getElementById('_wgUserColors');if(!s){{s=document.createElement('style');s.id='_wgUserColors';document.head.appendChild(s);}}s.textContent='{_css_rules}';
   var TM={_tm};
   var CM={_cm};
   var INIT_YM={_init_ym};
