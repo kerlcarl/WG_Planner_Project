@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from nicegui import ui
 from sqlalchemy.orm import joinedload
@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from models import MitbewohnerDB, Task
 from services import delete_task, get_session, save_task, update_task, update_task_status
 
-# Muss Quasar-Farbnamen sein – Quasar baut daraus bg-{name} CSS-Klassen
+# Quasar baut aus event-color den Klassenname bg-{name} → nur eingebaute Namen funktionieren
 _HEX_TO_QUASAR = {
     "#6366f1": "deep-purple",
     "#3b82f6": "blue",
@@ -35,14 +35,25 @@ def render_tasks_tab(container, current_user_id: int = None):
             tasks = session.query(Task).options(joinedload(Task.assigned_to)).all()
             users = session.query(MitbewohnerDB).all()
         # Nur Aufgaben mit Deadline im Kalender markieren.
+        now = datetime.now()
         event_days = list(dict.fromkeys(
             task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done
         ))
-        # Sortierung: Aufgaben mit Deadline zuerst (aufsteigend), danach ohne Datum
-        open_tasks = sorted(
-            [t for t in tasks if not t.is_done],
+        cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        soon_cutoff = now + timedelta(hours=24)
+        overdue_tasks = sorted(
+            [t for t in tasks if not t.is_done and t.due_date and t.due_date < cutoff],
+            key=lambda t: t.due_date,
+        )
+        soon_tasks = sorted(
+            [t for t in tasks if not t.is_done and t.due_date and cutoff <= t.due_date <= soon_cutoff],
+            key=lambda t: t.due_date,
+        )
+        upcoming_tasks = sorted(
+            [t for t in tasks if not t.is_done and not (t.due_date and t.due_date < cutoff) and not (t.due_date and t.due_date <= soon_cutoff)],
             key=lambda t: (t.due_date is None, t.due_date),
         )
+        open_tasks = overdue_tasks + soon_tasks + upcoming_tasks
         done_tasks = sorted(
             [t for t in tasks if t.is_done],
             key=lambda t: (t.due_date is None, t.due_date),
@@ -52,7 +63,6 @@ def render_tasks_tab(container, current_user_id: int = None):
             key=lambda t: t.due_date,
         )
         _WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-        now = datetime.now()
         today_str = now.strftime("%Y/%m/%d")
         datum_label = f"{_WOCHENTAGE[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
         uhrzeit_label = now.strftime("%H:%M")
@@ -64,8 +74,9 @@ def render_tasks_tab(container, current_user_id: int = None):
             task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(
                 f"{t.title} ({assigned})"
             )
-        # Farbpunkte: ein Punkt pro eindeutigem Nutzer pro Tag
+        # Farbpunkte: ein Punkt pro Tag in der Farbe des ersten Zuständigen
         color_map: dict[str, list[str]] = {}
+        date_to_class: dict[str, str] = {}
         _seen_uid: dict[str, set] = {}
         for t in tasks_with_deadline:
             day_str = t.due_date.strftime("%Y/%m/%d")
@@ -74,16 +85,11 @@ def render_tasks_tab(container, current_user_id: int = None):
             if uid in _seen_uid[day_str]:
                 continue
             _seen_uid[day_str].add(uid)
-            color_map.setdefault(day_str, []).append(
-                user_color.get(uid, "#f97316") if uid else "#f97316"
-            )
-        date_to_class: dict[str, str] = {}
-        for t in tasks_with_deadline:
-            day_str = t.due_date.strftime("%Y/%m/%d")
+            hex_c = user_color.get(uid, "#f97316") if uid else "#f97316"
+            qname = _HEX_TO_QUASAR.get(hex_c, "orange")
+            color_map.setdefault(day_str, []).append(hex_c)
             if day_str not in date_to_class:
-                uid = t.assigned_to_id
-                hex_color = user_color.get(uid, "#f97316") if uid else "#f97316"
-                date_to_class[day_str] = _HEX_TO_QUASAR.get(hex_color, "orange")
+                date_to_class[day_str] = qname
 
         with container:
             # Hero-Banner
@@ -290,16 +296,31 @@ def render_tasks_tab(container, current_user_id: int = None):
                             "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
                         )
 
-                    def _render_task_card(task, is_done):
-                        card_style = (
-                            "border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); "
-                            "border-left: 5px solid #86efac; background: #f0fdf4; "
-                            "padding: 0; overflow: hidden; margin-bottom: 10px"
-                            if is_done else
-                            "border-radius: 16px; box-shadow: 0 2px 10px rgba(249,115,22,0.10); "
-                            "border-left: 5px solid #f97316; background: white; "
-                            "padding: 0; overflow: hidden; margin-bottom: 10px"
-                        )
+                    def _render_task_card(task, is_done, is_overdue=False, is_soon=False):
+                        if is_done:
+                            card_style = (
+                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); "
+                                "border-left: 5px solid #86efac; background: #f0fdf4; "
+                                "padding: 0; overflow: hidden; margin-bottom: 10px"
+                            )
+                        elif is_overdue:
+                            card_style = (
+                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(239,68,68,0.12); "
+                                "border-left: 5px solid #ef4444; background: #fff5f5; "
+                                "padding: 0; overflow: hidden; margin-bottom: 10px"
+                            )
+                        elif is_soon:
+                            card_style = (
+                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(245,158,11,0.15); "
+                                "border-left: 5px solid #f59e0b; background: #fffbeb; "
+                                "padding: 0; overflow: hidden; margin-bottom: 10px"
+                            )
+                        else:
+                            card_style = (
+                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(249,115,22,0.10); "
+                                "border-left: 5px solid #f97316; background: white; "
+                                "padding: 0; overflow: hidden; margin-bottom: 10px"
+                            )
                         with ui.card().classes("w-full").style(card_style):
                             with ui.row().classes("w-full items-center p-3 gap-3"):
                                 ui.checkbox(
@@ -312,6 +333,8 @@ def render_tasks_tab(container, current_user_id: int = None):
                                     label_style = (
                                         "font-weight: 600; color: #6b7280; text-decoration: line-through"
                                         if is_done else
+                                        "font-weight: 700; color: #7f1d1d" if is_overdue else
+                                        "font-weight: 700; color: #92400e" if is_soon else
                                         "font-weight: 700; color: #1e1b4b"
                                     )
                                     ui.label(task.title).style(label_style)
@@ -320,6 +343,10 @@ def render_tasks_tab(container, current_user_id: int = None):
                                     if task.due_date:
                                         meta_parts.append(f"Deadline: {task.due_date.strftime('%d.%m.%Y')}")
                                     ui.label("  ·  ".join(meta_parts)).style(
+                                        "font-size: 0.78rem; color: #fca5a5; margin-top: 2px"
+                                        if is_overdue else
+                                        "font-size: 0.78rem; color: #d97706; margin-top: 2px"
+                                        if is_soon else
                                         "font-size: 0.78rem; color: #94a3b8; margin-top: 2px"
                                     )
                                 if not is_done:
@@ -337,8 +364,38 @@ def render_tasks_tab(container, current_user_id: int = None):
                                             ),
                                         ).props("flat round color=red")
 
+                    # Abgelaufene Aufgaben
+                    if overdue_tasks:
+                        with ui.row().classes("items-center gap-2 mb-3"):
+                            ui.icon("warning").style("color: #ef4444; font-size: 1.2rem")
+                            ui.label("Abgelaufen").style(
+                                "font-size: 1.05rem; font-weight: 700; color: #ef4444"
+                            )
+                            ui.label(str(len(overdue_tasks))).style(
+                                "background: #ef4444; color: white; border-radius: 999px; "
+                                "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
+                            )
+                        for task in overdue_tasks:
+                            _render_task_card(task, False, is_overdue=True)
+                        ui.separator().classes("my-4")
+
+                    # Bald fällige Aufgaben (< 24h)
+                    if soon_tasks:
+                        with ui.row().classes("items-center gap-2 mb-3"):
+                            ui.icon("schedule").style("color: #f59e0b; font-size: 1.2rem")
+                            ui.label("Bald fällig").style(
+                                "font-size: 1.05rem; font-weight: 700; color: #d97706"
+                            )
+                            ui.label(str(len(soon_tasks))).style(
+                                "background: #f59e0b; color: white; border-radius: 999px; "
+                                "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
+                            )
+                        for task in soon_tasks:
+                            _render_task_card(task, False, is_soon=True)
+                        ui.separator().classes("my-4")
+
                     # Offene Aufgaben
-                    if not open_tasks:
+                    if not upcoming_tasks and not overdue_tasks and not soon_tasks:
                         with ui.element("div").style(
                             "text-align: center; padding: 48px 20px; background: #fff7ed; "
                             "border-radius: 18px; border: 2px dashed #fed7aa"
@@ -351,7 +408,7 @@ def render_tasks_tab(container, current_user_id: int = None):
                                 "color: #fdba74; font-size: 0.85rem; margin-top: 4px"
                             )
                     else:
-                        for task in open_tasks:
+                        for task in upcoming_tasks:
                             _render_task_card(task, False)
 
                     # Erledigte Aufgaben
@@ -417,11 +474,10 @@ def render_tasks_tab(container, current_user_id: int = None):
     ensurePanel();
     cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{
       var btn=item.querySelector('button');if(!btn)return;
-      var sp=btn.querySelector('span.block');if(!sp)return;
-      var d=parseInt(sp.textContent.trim());if(isNaN(d))return;
+      var sp=btn.querySelector('span.block')||btn.querySelector('span');
+      var d=sp?parseInt(sp.textContent.trim()):NaN;if(isNaN(d))return;
       var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
       var colors=CM[ds]||[];
-      if(colors.length>1&&!item.dataset.wgDots){{item.dataset.wgDots='1';var ed=item.querySelector('.q-date__event');if(ed){{var n=colors.length,gap=6,so=-((n-1)*gap)/2;ed.style.transform='translateX(calc(-50% + '+so+'px))';for(var ci=1;ci<n;ci++){{var xd=document.createElement('div');xd.style.cssText='position:absolute;bottom:4px;width:4px;height:4px;border-radius:50%;left:50%;transform:translateX(calc(-50% + '+(so+ci*gap)+'px));background:'+colors[ci]+';pointer-events:none;border-radius:50%;';item.appendChild(xd);}}}}}}
       if(btn.dataset.wgH)return;btn.dataset.wgH='1';
       var tasks=TM[ds]||[];
       btn.addEventListener('mouseenter',function(e){{if(!tasks.length)return;tip.innerHTML='<b>'+String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
@@ -446,7 +502,7 @@ def render_tasks_tab(container, current_user_id: int = None):
       }});
     }});
   }}
-  setTimeout(attach,600);
+  setTimeout(attach,900);
   var el=document.querySelector('.wg-tasks-calendar');
   if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{var p=document.getElementById('_wgSelPanel');if(p)p.style.display='none';document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,350);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
 }})();""")
