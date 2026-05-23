@@ -4,7 +4,7 @@ from nicegui import app, ui
 from pydantic import BaseModel
 
 from auth_services import get_user_by_id
-from models import Task, init_db, seed_db
+from models import init_db, seed_db
 from services import assign_palette_colors, get_session
 from ui import (
     register_forgot_password_page,
@@ -305,18 +305,6 @@ async function reactToPost(postId, emoji, userId) {
                 "text-shadow: 0 2px 12px rgba(0,0,0,0.25); letter-spacing: -0.5px"
             )
             ui.space()
-            with ui.element("div").style("position: relative; margin-right: 4px"):
-                bell_btn = ui.button(
-                    icon="notifications",
-                    on_click=lambda: tabs.set_value(tasks_tab),
-                ).props("flat round").style("color: white; font-size: 1.4rem")
-                overdue_badge = ui.badge("").props("floating").style(
-                    "background: #ef4444; color: white; font-weight: 700; "
-                    "font-size: 0.68rem; min-width: 18px; height: 18px; "
-                    "border-radius: 9px; padding: 0 5px"
-                )
-                overdue_badge.set_visibility(False)
-                ui.tooltip("Überfällige Ämtli").style("font-size: 0.8rem")
             with ui.element("div").style("position: relative"):
                 avatar = ui.html(_avatar_html(current_user or {"name": "?"}, 38))
                 with ui.menu().props("auto-close") as user_menu:
@@ -363,24 +351,6 @@ async function reactToPost(postId, emoji, userId) {
     ui.timer(10.0, users_refresh)
     ui.timer(10.0, finances_refresh)
     ui.timer(10.0, tasks_refresh)
-
-    def _refresh_overdue_badge():
-        from datetime import date, datetime, time
-        cutoff = datetime.combine(date.today(), time())
-        with get_session() as s:
-            count = s.query(Task).filter(
-                Task.is_done == False,
-                Task.due_date.isnot(None),
-                Task.due_date < cutoff,
-            ).count()
-        if count > 0:
-            overdue_badge.set_text(str(count))
-            overdue_badge.set_visibility(True)
-        else:
-            overdue_badge.set_visibility(False)
-
-    _refresh_overdue_badge()
-    ui.timer(10.0, _refresh_overdue_badge)
 
     def _on_tab_change(e):
         # Finanzen-Tab bei jedem Wechsel neu aufbauen, damit das Layout
