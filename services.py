@@ -229,10 +229,12 @@ def save_task(title_val: str, who_id, due_date_str: str) -> str | None:
 
 
 def update_task_status(task_id: int, value: bool) -> None:
+    from datetime import datetime
     with get_session() as session:
         task = session.get(Task, task_id)
         if task:
             task.is_done = value
+            task.completed_at = datetime.now() if value else None
             session.commit()
 
 

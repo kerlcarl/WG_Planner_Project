@@ -58,7 +58,8 @@ class Task(Base):
     priority: str = Column(String, default='Normal') # z.B. 'Dringend' (User Story)
     is_done: bool = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
-    due_date = Column(DateTime, nullable=True)  # Fälligkeitsdatum
+    due_date = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
 
     # Foreign Key zu Mitbewohner (Unit 7)
     assigned_to_id = Column(Integer, ForeignKey('users.id'))
@@ -179,6 +180,7 @@ def _migrate_sqlite() -> None:
     inspector = inspect(engine)
     pending: list[tuple[str, str, str]] = [
         ('tasks', 'due_date', 'DATETIME'),
+        ('tasks', 'completed_at', 'DATETIME'),
         ('users', 'email', 'TEXT'),
         ('users', 'password_hash', 'TEXT'),
         ('users', 'avatar_path', 'TEXT'),

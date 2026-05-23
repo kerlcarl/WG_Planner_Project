@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta
 
 from nicegui import ui
@@ -7,40 +6,28 @@ from sqlalchemy.orm import joinedload
 from models import MitbewohnerDB, Task
 from services import delete_task, get_session, save_task, update_task, update_task_status
 
-# Quasar baut aus event-color den Klassenname bg-{name} → nur eingebaute Namen funktionieren
-_HEX_TO_QUASAR = {
-    "#6366f1": "deep-purple",
-    "#3b82f6": "blue",
-    "#ef4444": "red",
-    "#10b981": "green",
-    "#f59e0b": "amber",
-    "#06b6d4": "cyan",
-    "#ec4899": "pink",
-    "#f97316": "orange",
-}
+_WOCHENTAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+_WOCHENTAGE_LANG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
 
-# Rendert den Aufgaben-Tab und liefert eine Refresh-Funktion zurueck.
 def render_tasks_tab(container, current_user_id: int = None):
     _form_active = {"value": False}
     _dialog_open = {"value": False}
 
-    # Baut den kompletten Tab aus aktuellen DB-Daten neu auf.
     def refresh():
         if _form_active["value"] or _dialog_open["value"]:
             return
         container.clear()
         with get_session() as session:
-            # joinedload verhindert DetachedInstanceError nach Session-Close.
             tasks = session.query(Task).options(joinedload(Task.assigned_to)).all()
             users = session.query(MitbewohnerDB).all()
-        # Nur Aufgaben mit Deadline im Kalender markieren.
+
         now = datetime.now()
-        event_days = list(dict.fromkeys(
-            task.due_date.strftime("%Y/%m/%d") for task in tasks if task.due_date and not task.is_done
-        ))
+        today_str = now.strftime("%Y/%m/%d")
         cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
         soon_cutoff = now + timedelta(hours=24)
+        datum_label = f"{_WOCHENTAGE_LANG[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
+
         overdue_tasks = sorted(
             [t for t in tasks if not t.is_done and t.due_date and t.due_date < cutoff],
             key=lambda t: t.due_date,
@@ -50,7 +37,9 @@ def render_tasks_tab(container, current_user_id: int = None):
             key=lambda t: t.due_date,
         )
         upcoming_tasks = sorted(
-            [t for t in tasks if not t.is_done and not (t.due_date and t.due_date < cutoff) and not (t.due_date and t.due_date <= soon_cutoff)],
+            [t for t in tasks if not t.is_done
+             and not (t.due_date and t.due_date < cutoff)
+             and not (t.due_date and t.due_date <= soon_cutoff)],
             key=lambda t: (t.due_date is None, t.due_date),
         )
         open_tasks = overdue_tasks + soon_tasks + upcoming_tasks
@@ -58,73 +47,52 @@ def render_tasks_tab(container, current_user_id: int = None):
             [t for t in tasks if t.is_done],
             key=lambda t: (t.due_date is None, t.due_date),
         )
-        tasks_with_deadline = sorted(
-            [t for t in tasks if t.due_date and not t.is_done],
-            key=lambda t: t.due_date,
-        )
-        _WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-        today_str = now.strftime("%Y/%m/%d")
-        datum_label = f"{_WOCHENTAGE[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
-        uhrzeit_label = now.strftime("%H:%M")
-        # Tooltip-Inhalt: Titel + Zuständige*r für jeden Tag
-        task_map = {}
-        user_color = {u.id: (u.color or "#336699") for u in users}
-        for t in tasks_with_deadline:
-            assigned = t.assigned_to.name if t.assigned_to else "–"
-            task_map.setdefault(t.due_date.strftime("%Y/%m/%d"), []).append(
-                f"{t.title} ({assigned})"
-            )
-        # Farbpunkte: ein Punkt pro Tag in der Farbe des ersten Zuständigen
-        color_map: dict[str, list[str]] = {}
-        date_to_class: dict[str, str] = {}
-        _seen_uid: dict[str, set] = {}
-        for t in tasks_with_deadline:
-            day_str = t.due_date.strftime("%Y/%m/%d")
-            uid = t.assigned_to_id
-            _seen_uid.setdefault(day_str, set())
-            if uid in _seen_uid[day_str]:
-                continue
-            _seen_uid[day_str].add(uid)
-            hex_c = user_color.get(uid, "#f97316") if uid else "#f97316"
-            qname = _HEX_TO_QUASAR.get(hex_c, "orange")
-            color_map.setdefault(day_str, []).append(hex_c)
-            if day_str not in date_to_class:
-                date_to_class[day_str] = qname
 
         with container:
-            # Hero-Banner
+            # ── Hero-Banner ───────────────────────────────────────────────────
             with ui.element("div").style(
                 "background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 60%, #fdba74 100%); "
-                "border-radius: 20px; padding: 28px 32px; margin-bottom: 20px; "
+                "border-radius: 20px; padding: 24px 32px; margin-bottom: 20px; "
                 "box-shadow: 0 4px 20px rgba(249,115,22,0.16)"
             ):
                 with ui.row().classes("w-full items-center justify-between flex-wrap gap-4"):
                     with ui.row().classes("items-center gap-4"):
                         with ui.element("div").style(
-                            "background: #f97316; border-radius: 16px; width: 56px; height: 56px; "
+                            "background: #f97316; border-radius: 16px; width: 52px; height: 52px; "
                             "display: flex; align-items: center; justify-content: center; flex-shrink: 0"
                         ):
-                            ui.icon("task_alt").style("color: white; font-size: 2rem")
+                            ui.icon("task_alt").style("color: white; font-size: 1.9rem")
                         with ui.column().classes("gap-0"):
-                            ui.label("Ämtli & Kalender").style(
+                            ui.label("Ämtli").style(
                                 "font-size: 1.4rem; font-weight: 800; color: #9a3412; line-height: 1.2"
                             )
                             ui.label("Aufgaben verwalten und den Überblick behalten").style(
                                 "color: #f97316; font-size: 0.85rem; margin-top: 4px"
                             )
-                    with ui.row().classes("gap-6"):
-                        with ui.column().classes("items-end gap-0"):
-                            ui.label(str(len(open_tasks))).style(
-                                "font-size: 1.9rem; font-weight: 900; color: #9a3412; line-height: 1"
+                    with ui.row().classes("items-center gap-4 flex-wrap"):
+                        for count, label, color in [
+                            (len(overdue_tasks), "Abgelaufen", "#ef4444"),
+                            (len(soon_tasks),    "Bald fällig", "#f97316"),
+                            (len(upcoming_tasks),"Zu erledigen", "#ca8a04"),
+                            (len(done_tasks),    "Erledigt",    "#16a34a"),
+                        ]:
+                            with ui.column().classes("items-center gap-0"):
+                                ui.label(str(count)).style(
+                                    f"font-size: 1.7rem; font-weight: 900; color: {color}; line-height: 1"
+                                )
+                                ui.label(label).style(
+                                    f"color: {color}; font-size: 0.72rem; font-weight: 600; margin-top: 2px"
+                                )
+                        # Aktuelles Datum oben rechts
+                        with ui.element("div").style(
+                            "background: white; border-radius: 14px; padding: 8px 16px; "
+                            "box-shadow: 0 2px 10px rgba(249,115,22,0.15); text-align: right"
+                        ):
+                            ui.label(datum_label).style(
+                                "font-size: 0.95rem; font-weight: 700; color: #9a3412"
                             )
-                            ui.label("Offen").style("color: #f97316; font-size: 0.78rem; margin-top: 2px")
-                        with ui.column().classes("items-end gap-0"):
-                            ui.label(str(len(done_tasks))).style(
-                                "font-size: 1.9rem; font-weight: 900; color: #9a3412; line-height: 1"
-                            )
-                            ui.label("Erledigt").style("color: #f97316; font-size: 0.78rem; margin-top: 2px")
 
-            # ── Ämtli-Bearbeiten-Dialog ───────────────────────────────────────
+            # ── Bearbeiten-Dialog ─────────────────────────────────────────────
             _edit_task_id = {"value": None}
 
             with ui.dialog().props("persistent") as edit_task_dialog, ui.card().classes(
@@ -186,16 +154,133 @@ def render_tasks_tab(container, current_user_id: int = None):
                 _dialog_open["value"] = True
                 edit_task_dialog.open()
 
-            # 3-Spalten-Layout
+            def _deadline_badge(task, badge_bg, badge_text_color):
+                if not task.due_date:
+                    return
+                tag = _WOCHENTAGE_KURZ[task.due_date.weekday()]
+                date_str = task.due_date.strftime("%d.%m.%Y")
+                with ui.element("div").style(
+                    f"background: {badge_bg}; border-radius: 10px; padding: 5px 10px; "
+                    f"text-align: center; flex-shrink: 0; min-width: 68px"
+                ):
+                    ui.label(tag).style(
+                        f"font-size: 0.7rem; font-weight: 700; color: {badge_text_color}; "
+                        f"text-transform: uppercase; line-height: 1.2"
+                    )
+                    ui.label(date_str).style(
+                        f"font-size: 0.75rem; font-weight: 800; color: {badge_text_color}; line-height: 1.3"
+                    )
+
+            def _render_task_card(task, is_done, is_overdue=False, is_soon=False, is_upcoming=False):
+                if is_done:
+                    card_style = (
+                        "border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); "
+                        "border-left: 5px solid #86efac; background: #f0fdf4; "
+                        "padding: 0; overflow: hidden; margin-bottom: 8px"
+                    )
+                    badge_bg, badge_tc = "#dcfce7", "#16a34a"
+                elif is_overdue:
+                    card_style = (
+                        "border-radius: 14px; box-shadow: 0 2px 8px rgba(239,68,68,0.12); "
+                        "border-left: 5px solid #ef4444; background: #fff5f5; "
+                        "padding: 0; overflow: hidden; margin-bottom: 8px"
+                    )
+                    badge_bg, badge_tc = "#fee2e2", "#ef4444"
+                elif is_soon:
+                    card_style = (
+                        "border-radius: 14px; box-shadow: 0 2px 8px rgba(249,115,22,0.15); "
+                        "border-left: 5px solid #f97316; background: #fff7ed; "
+                        "padding: 0; overflow: hidden; margin-bottom: 8px"
+                    )
+                    badge_bg, badge_tc = "#fed7aa", "#c2410c"
+                elif is_upcoming:
+                    card_style = (
+                        "border-radius: 14px; box-shadow: 0 2px 8px rgba(234,179,8,0.15); "
+                        "border-left: 5px solid #eab308; background: #fefce8; "
+                        "padding: 0; overflow: hidden; margin-bottom: 8px"
+                    )
+                    badge_bg, badge_tc = "#fef08a", "#854d0e"
+                else:
+                    card_style = (
+                        "border-radius: 14px; box-shadow: 0 2px 8px rgba(234,179,8,0.10); "
+                        "border-left: 5px solid #eab308; background: #fefce8; "
+                        "padding: 0; overflow: hidden; margin-bottom: 8px"
+                    )
+                    badge_bg, badge_tc = "#fef08a", "#854d0e"
+
+                with ui.card().classes("w-full").style(card_style):
+                    with ui.row().classes("w-full items-center p-3 gap-3"):
+                        ui.checkbox(
+                            value=is_done,
+                            on_change=lambda event, t=task: (
+                                update_task_status(t.id, event.value), refresh()
+                            ),
+                        ).style("flex-shrink: 0")
+                        with ui.column().classes("flex-grow gap-0"):
+                            label_style = (
+                                "font-weight: 600; color: #6b7280; text-decoration: line-through"
+                                if is_done else
+                                "font-weight: 700; color: #7f1d1d" if is_overdue else
+                                "font-weight: 700; color: #9a3412" if is_soon else
+                                "font-weight: 700; color: #713f12"
+                            )
+                            ui.label(task.title).style(label_style)
+                            assigned_name = task.assigned_to.name if task.assigned_to else "Niemand"
+                            ui.label(f"Zuständig: {assigned_name}").style(
+                                "font-size: 0.78rem; margin-top: 2px; "
+                                + ("color: #fca5a5" if is_overdue else
+                                   "color: #fdba74" if is_soon else
+                                   "color: #a16207" if (is_upcoming or not is_done) else
+                                   "color: #94a3b8")
+                            )
+                        if is_done and task.completed_at:
+                            with ui.element("div").style(
+                                "background: #dcfce7; border-radius: 10px; padding: 5px 10px; "
+                                "text-align: center; flex-shrink: 0; min-width: 68px"
+                            ):
+                                ui.label("Erledigt").style(
+                                    "font-size: 0.7rem; font-weight: 700; color: #16a34a; "
+                                    "text-transform: uppercase; line-height: 1.2"
+                                )
+                                ui.label(task.completed_at.strftime("%d.%m.%Y")).style(
+                                    "font-size: 0.75rem; font-weight: 800; color: #16a34a; line-height: 1.3"
+                                )
+                        elif task.due_date and not is_done:
+                            _deadline_badge(task, badge_bg, badge_tc)
+                        if not is_done:
+                            with ui.row().classes("gap-0 flex-shrink-0"):
+                                ui.button(
+                                    icon="edit",
+                                    on_click=lambda t=task: _open_edit_task_dialog(t),
+                                ).props("flat round color=orange").style("width: 32px; height: 32px")
+                                ui.button(
+                                    icon="delete",
+                                    on_click=lambda t=task: (
+                                        delete_task(t.id),
+                                        ui.notify("Ämtli gelöscht", color="negative"),
+                                        refresh(),
+                                    ),
+                                ).props("flat round color=red").style("width: 32px; height: 32px")
+
+            def _section_header(icon_name, label, count, color):
+                with ui.row().classes("items-center gap-2 mb-3"):
+                    ui.icon(icon_name).style(f"color: {color}; font-size: 1.15rem")
+                    ui.label(label).style(f"font-size: 1rem; font-weight: 700; color: {color}")
+                    ui.label(str(count)).style(
+                        f"background: {color}; color: white; border-radius: 999px; "
+                        f"font-size: 0.75rem; font-weight: 700; padding: 2px 8px"
+                    )
+
+            # ── 3-Spalten-Layout ──────────────────────────────────────────────
             with ui.element("div").classes("wg-grid-3"):
 
-                # ── Spalte 1: Neues Ämtli ────────────────────────────────────
+                # ── Spalte 1: Neues Ämtli ─────────────────────────────────────
                 with ui.element("div"):
                     with ui.card().classes("w-full").style(
                         "border-radius: 18px; box-shadow: 0 4px 20px rgba(249,115,22,0.10); "
                         "border: 1.5px solid #fed7aa; padding: 22px"
                     ):
-                        with ui.row().classes("items-center gap-3 mb-3"):
+                        with ui.row().classes("items-center gap-3 mb-4"):
                             ui.icon("add_task").style("color: #f97316; font-size: 1.4rem")
                             ui.label("Neues Ämtli erstellen").style(
                                 "font-size: 1rem; font-weight: 700; color: #9a3412"
@@ -235,277 +320,61 @@ def render_tasks_tab(container, current_user_id: int = None):
 
                         title.on("keydown.enter", handle_task)
                         ui.button("Ämtli erstellen", icon="add", on_click=handle_task).classes(
-                            "w-full bg-orange-500 text-white mt-3"
+                            "w-full bg-orange-500 text-white mt-4"
                         ).style("border-radius: 10px; font-weight: 600")
 
-                # ── Spalte 2: Kalender ───────────────────────────────────────
+                # ── Spalte 2: Abgelaufen + Bald fällig ───────────────────────
                 with ui.element("div"):
-                    with ui.card().classes("w-full shadow-md rounded-xl bg-white"):
-                        with ui.row().classes(
-                            "w-full items-center justify-between px-4 pt-4 pb-1 flex-wrap gap-2"
-                        ):
-                            with ui.row().classes("items-center gap-2"):
-                                ui.icon("calendar_month").style("color: #f97316; font-size: 1.3rem")
-                                with ui.column().classes("gap-0"):
-                                    ui.label("Ämtli-Kalender").style(
-                                        "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
-                                    )
-                                    ui.label("Punkt = Zuständige*r · Grau = vergangen · Hover/Klick").style(
-                                        "font-size: 0.73rem; color: #94a3b8"
-                                    )
-                            with ui.column().classes("items-end gap-0"):
-                                ui.label(datum_label).style(
-                                    "font-size: 0.88rem; font-weight: 700; color: #9a3412"
-                                )
-                                ui.label(uhrzeit_label).style(
-                                    "font-size: 1.1rem; font-weight: 800; color: #f97316"
-                                )
-                        with ui.element("div").classes("px-4 pb-4"):
-                            _dtc = json.dumps(date_to_class, separators=(',', ':'))
-                            ui.date().props(
-                                f':events=\'{json.dumps(event_days)}\' '
-                                f':event-color=\'(d) => ({_dtc})[d] || "orange"\' '
-                                f':options="d => d >= \'{today_str}\'"'
-                            ).classes("w-full wg-tasks-calendar")
-                        # Farblegende: wer hat welche Farbe
-                        with ui.element("div").classes("px-4 pb-3 pt-2").style(
-                            "border-top: 1px solid #f1f5f9"
-                        ):
-                            with ui.row().classes("items-center gap-4 flex-wrap"):
-                                for u in users:
-                                    _col = u.color or "#336699"
-                                    with ui.row().classes("items-center gap-1"):
-                                        ui.element("div").style(
-                                            f"width:11px;height:11px;border-radius:50%;"
-                                            f"background:{_col};flex-shrink:0;"
-                                            f"box-shadow:0 1px 3px rgba(0,0,0,0.25)"
-                                        )
-                                        ui.label(u.name).style(
-                                            "font-size:0.75rem;color:#475569;font-weight:600"
-                                        )
-
-                # ── Spalte 3: Aufgabenliste ──────────────────────────────────
-                with ui.element("div"):
-                    with ui.row().classes("items-center gap-2 mb-3"):
-                        ui.icon("pending_actions").style("color: #f97316; font-size: 1.2rem")
-                        ui.label("Aufgaben").style(
-                            "font-size: 1.05rem; font-weight: 700; color: #1e1b4b"
-                        )
-                        ui.label(str(len(open_tasks))).style(
-                            "background: #f97316; color: white; border-radius: 999px; "
-                            "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
-                        )
-
-                    def _render_task_card(task, is_done, is_overdue=False, is_soon=False):
-                        if is_done:
-                            card_style = (
-                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); "
-                                "border-left: 5px solid #86efac; background: #f0fdf4; "
-                                "padding: 0; overflow: hidden; margin-bottom: 10px"
-                            )
-                        elif is_overdue:
-                            card_style = (
-                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(239,68,68,0.12); "
-                                "border-left: 5px solid #ef4444; background: #fff5f5; "
-                                "padding: 0; overflow: hidden; margin-bottom: 10px"
-                            )
-                        elif is_soon:
-                            card_style = (
-                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(245,158,11,0.15); "
-                                "border-left: 5px solid #f59e0b; background: #fffbeb; "
-                                "padding: 0; overflow: hidden; margin-bottom: 10px"
-                            )
-                        else:
-                            card_style = (
-                                "border-radius: 16px; box-shadow: 0 2px 10px rgba(249,115,22,0.10); "
-                                "border-left: 5px solid #f97316; background: white; "
-                                "padding: 0; overflow: hidden; margin-bottom: 10px"
-                            )
-                        with ui.card().classes("w-full").style(card_style):
-                            with ui.row().classes("w-full items-center p-3 gap-3"):
-                                ui.checkbox(
-                                    value=is_done,
-                                    on_change=lambda event, t=task: (
-                                        update_task_status(t.id, event.value), refresh()
-                                    ),
-                                ).style("flex-shrink: 0")
-                                with ui.column().classes("flex-grow gap-0"):
-                                    label_style = (
-                                        "font-weight: 600; color: #6b7280; text-decoration: line-through"
-                                        if is_done else
-                                        "font-weight: 700; color: #7f1d1d" if is_overdue else
-                                        "font-weight: 700; color: #92400e" if is_soon else
-                                        "font-weight: 700; color: #1e1b4b"
-                                    )
-                                    ui.label(task.title).style(label_style)
-                                    assigned_name = task.assigned_to.name if task.assigned_to else "Niemand"
-                                    meta_parts = [f"Zuständig: {assigned_name}"]
-                                    if task.due_date:
-                                        meta_parts.append(f"Deadline: {task.due_date.strftime('%d.%m.%Y')}")
-                                    ui.label("  ·  ".join(meta_parts)).style(
-                                        "font-size: 0.78rem; color: #fca5a5; margin-top: 2px"
-                                        if is_overdue else
-                                        "font-size: 0.78rem; color: #d97706; margin-top: 2px"
-                                        if is_soon else
-                                        "font-size: 0.78rem; color: #94a3b8; margin-top: 2px"
-                                    )
-                                if not is_done:
-                                    with ui.row().classes("gap-0"):
-                                        ui.button(
-                                            icon="edit",
-                                            on_click=lambda t=task: _open_edit_task_dialog(t),
-                                        ).props("flat round color=orange")
-                                        ui.button(
-                                            icon="delete",
-                                            on_click=lambda t=task: (
-                                                delete_task(t.id),
-                                                ui.notify("Ämtli gelöscht", color="negative"),
-                                                refresh(),
-                                            ),
-                                        ).props("flat round color=red")
-
-                    # Abgelaufene Aufgaben
                     if overdue_tasks:
-                        with ui.row().classes("items-center gap-2 mb-3"):
-                            ui.icon("warning").style("color: #ef4444; font-size: 1.2rem")
-                            ui.label("Abgelaufen").style(
-                                "font-size: 1.05rem; font-weight: 700; color: #ef4444"
-                            )
-                            ui.label(str(len(overdue_tasks))).style(
-                                "background: #ef4444; color: white; border-radius: 999px; "
-                                "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
-                            )
+                        _section_header("warning", "Abgelaufen", len(overdue_tasks), "#ef4444")
                         for task in overdue_tasks:
                             _render_task_card(task, False, is_overdue=True)
-                        ui.separator().classes("my-4")
+                        if soon_tasks:
+                            ui.separator().classes("my-4")
 
-                    # Bald fällige Aufgaben (< 24h)
                     if soon_tasks:
-                        with ui.row().classes("items-center gap-2 mb-3"):
-                            ui.icon("schedule").style("color: #f59e0b; font-size: 1.2rem")
-                            ui.label("Bald fällig").style(
-                                "font-size: 1.05rem; font-weight: 700; color: #d97706"
-                            )
-                            ui.label(str(len(soon_tasks))).style(
-                                "background: #f59e0b; color: white; border-radius: 999px; "
-                                "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
-                            )
+                        _section_header("schedule", "Bald fällig", len(soon_tasks), "#f97316")
                         for task in soon_tasks:
                             _render_task_card(task, False, is_soon=True)
-                        ui.separator().classes("my-4")
 
-                    # Offene Aufgaben
-                    if not upcoming_tasks and not overdue_tasks and not soon_tasks:
+                    if not overdue_tasks and not soon_tasks:
                         with ui.element("div").style(
-                            "text-align: center; padding: 48px 20px; background: #fff7ed; "
-                            "border-radius: 18px; border: 2px dashed #fed7aa"
+                            "text-align: center; padding: 40px 16px; background: #fff7ed; "
+                            "border-radius: 16px; border: 2px dashed #fed7aa"
                         ):
-                            ui.icon("task_alt").style("color: #fdba74; font-size: 3.5rem")
-                            ui.label("Keine offenen Ämtli vorhanden.").style(
-                                "color: #fb923c; margin-top: 10px; font-weight: 600"
+                            ui.icon("check_circle_outline").style("color: #fdba74; font-size: 3rem")
+                            ui.label("Alles im grünen Bereich!").style(
+                                "color: #f97316; margin-top: 8px; font-weight: 600; font-size: 0.95rem"
+                            )
+                            ui.label("Keine abgelaufenen oder dringenden Ämtli.").style(
+                                "color: #fdba74; font-size: 0.82rem; margin-top: 4px"
+                            )
+
+                # ── Spalte 3: Offen + Erledigt ────────────────────────────────
+                with ui.element("div"):
+                    if upcoming_tasks:
+                        _section_header("pending_actions", "Zu erledigen", len(upcoming_tasks), "#ca8a04")
+                        for task in upcoming_tasks:
+                            _render_task_card(task, False, is_upcoming=True)
+                    elif not overdue_tasks and not soon_tasks:
+                        with ui.element("div").style(
+                            "text-align: center; padding: 40px 16px; background: #fefce8; "
+                            "border-radius: 16px; border: 2px dashed #fde047"
+                        ):
+                            ui.icon("task_alt").style("color: #eab308; font-size: 3rem")
+                            ui.label("Keine offenen Ämtli.").style(
+                                "color: #ca8a04; margin-top: 8px; font-weight: 600"
                             )
                             ui.label("Erstelle links dein erstes Ämtli!").style(
-                                "color: #fdba74; font-size: 0.85rem; margin-top: 4px"
+                                "color: #eab308; font-size: 0.82rem; margin-top: 4px"
                             )
-                    else:
-                        for task in upcoming_tasks:
-                            _render_task_card(task, False)
 
-                    # Erledigte Aufgaben
                     if done_tasks:
-                        ui.separator().classes("my-4")
-                        with ui.row().classes("items-center gap-2 mb-3"):
-                            ui.icon("check_circle").style("color: #16a34a; font-size: 1.2rem")
-                            ui.label("Erledigt").style(
-                                "font-size: 1.05rem; font-weight: 700; color: #16a34a"
-                            )
-                            ui.label(str(len(done_tasks))).style(
-                                "background: #16a34a; color: white; border-radius: 999px; "
-                                "font-size: 0.78rem; font-weight: 700; padding: 2px 9px"
-                            )
+                        if upcoming_tasks:
+                            ui.separator().classes("my-4")
+                        _section_header("check_circle", "Erledigt", len(done_tasks), "#16a34a")
                         for task in done_tasks:
                             _render_task_card(task, True)
-
-        # Kalender-Interaktion: farbige Nutzerpunkte, Hover-Tooltip, Klick-Panel
-        _tm = json.dumps(task_map)
-        _cm = json.dumps(color_map)
-        _init_ym = json.dumps({"y": now.year, "m": now.month})
-        ui.run_javascript(f"""(function(){{
-  var TM={_tm};
-  var CM={_cm};
-  var INIT_YM={_init_ym};
-  var MO={{'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12,'Januar':1,'Februar':2,'März':3,'April':4,'Mai':5,'Juni':6,'Juli':7,'August':8,'September':9,'Oktober':10,'November':11,'Dezember':12}};
-  var tip=document.getElementById('_wgTip');
-  if(!tip){{tip=document.createElement('div');tip.id='_wgTip';tip.style.cssText='position:fixed;z-index:9999;background:#1e1b4b;color:white;padding:8px 14px;border-radius:12px;font-size:0.82rem;pointer-events:none;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);line-height:1.7;max-width:260px;';document.body.appendChild(tip);}}
-  function getYM(){{
-    var cal=document.querySelector('.wg-tasks-calendar');
-    if(!cal)return null;
-    var y=null,m=null;
-    function scanWords(root){{
-      root.querySelectorAll('button,span,div').forEach(function(el){{
-        if(el.children.length)return;
-        (el.textContent||'').trim().split(/\\s+/).forEach(function(w){{
-          if(!m&&MO[w])m=MO[w];
-          var n=parseInt(w);
-          if(!y&&!isNaN(n)&&n>=2020&&n<=2040)y=n;
-        }});
-      }});
-    }}
-    var nav=cal.querySelector('.q-date__navigation');
-    if(nav)scanWords(nav);
-    if(!m||!y){{
-      var grid=cal.querySelector('.q-date__calendar-days');
-      cal.querySelectorAll('button,span,div').forEach(function(el){{
-        if(grid&&grid.contains(el))return;
-        if(el.children.length)return;
-        (el.textContent||'').trim().split(/\\s+/).forEach(function(w){{
-          if(!m&&MO[w])m=MO[w];
-          var n=parseInt(w);
-          if(!y&&!isNaN(n)&&n>=2020&&n<=2040)y=n;
-        }});
-      }});
-    }}
-    return(m&&y)?{{y:y,m:m}}:null;
-  }}
-  function ensurePanel(){{var p=document.getElementById('_wgSelPanel');if(!p){{var w=document.querySelector('.wg-tasks-calendar');if(!w)return null;p=document.createElement('div');p.id='_wgSelPanel';p.style.cssText='display:none;background:#fff7ed;border-radius:12px;padding:12px 16px;margin-top:10px;border:2px solid #fed7aa;font-size:0.83rem;line-height:1.8;';w.parentNode.insertBefore(p,w.nextSibling);}}return p;}}
-  function attach(){{
-    var ym=getYM()||INIT_YM;
-    var cal=document.querySelector('.wg-tasks-calendar .q-date__calendar-days');if(!cal)return;
-    ensurePanel();
-    cal.querySelectorAll('.q-date__calendar-item--event').forEach(function(item){{
-      var btn=item.querySelector('button');if(!btn)return;
-      var sp=btn.querySelector('span.block')||btn.querySelector('span');
-      var d=sp?parseInt(sp.textContent.trim()):NaN;if(isNaN(d))return;
-      var ds=ym.y+'/'+String(ym.m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
-      var colors=CM[ds]||[];
-      if(btn.dataset.wgH)return;btn.dataset.wgH='1';
-      var tasks=TM[ds]||[];
-      btn.addEventListener('mouseenter',function(e){{if(!tasks.length)return;tip.innerHTML='<b>'+String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y+'</b><br>'+tasks.map(function(t){{return '• '+t;}}).join('<br>');tip.style.display='block';tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
-      btn.addEventListener('mousemove',function(e){{tip.style.left=(e.clientX+16)+'px';tip.style.top=(e.clientY-8)+'px';}});
-      btn.addEventListener('mouseleave',function(){{tip.style.display='none';}});
-      btn.addEventListener('click',function(){{
-        tip.style.display='none';if(!tasks.length)return;
-        var panel=document.getElementById('_wgSelPanel');if(!panel)return;
-        document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';b.style.outlineOffset='';}});
-        btn.classList.add('wg-sel');btn.style.outline='2px solid #f97316';btn.style.outlineOffset='2px';
-        var dh=colors.map(function(c){{return '<span style="width:9px;height:9px;border-radius:50%;background:'+c+';display:inline-block;margin-left:4px;vertical-align:middle;"></span>';}}).join('');
-        var dateStr=String(d).padStart(2,'0')+'.'+String(ym.m).padStart(2,'0')+'.'+ym.y;
-        panel.innerHTML='<div style="font-weight:700;color:#9a3412;margin-bottom:8px;">'+dateStr+dh+'</div>'+tasks.map(function(t){{return '<div style="padding:2px 0 2px 8px;color:#1e1b4b;border-left:3px solid #f97316;margin-bottom:4px;">'+t+'</div>';}}).join('');
-        panel.style.display='block';
-      }});
-    }});
-    cal.querySelectorAll('.q-date__calendar-item:not(.q-date__calendar-item--event) button').forEach(function(btn){{
-      if(btn.dataset.wgNE)return;btn.dataset.wgNE='1';
-      btn.addEventListener('click',function(){{
-        var panel=document.getElementById('_wgSelPanel');if(panel)panel.style.display='none';
-        document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});
-      }});
-    }});
-  }}
-  setTimeout(attach,900);
-  var el=document.querySelector('.wg-tasks-calendar');
-  if(el){{if(window._wgCalObs)window._wgCalObs.disconnect();window._wgCalObs=new MutationObserver(function(){{var p=document.getElementById('_wgSelPanel');if(p)p.style.display='none';document.querySelectorAll('.wg-tasks-calendar .wg-sel').forEach(function(b){{b.classList.remove('wg-sel');b.style.outline='';}});clearTimeout(window._wgCalT);window._wgCalT=setTimeout(attach,350);}});window._wgCalObs.observe(el,{{subtree:true,childList:true}});}}
-}})();""")
 
     refresh()
     return refresh

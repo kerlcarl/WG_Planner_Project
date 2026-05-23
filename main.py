@@ -335,7 +335,7 @@ async function reactToPost(postId, emoji, userId) {
     with ui.tabs().classes("w-full bg-white shadow-sm") as tabs:
         users_tab = ui.tab("Mitbewohner*innen", icon="people")
         finances_tab = ui.tab("Finanzen", icon="payments")
-        tasks_tab = ui.tab("Ämtli & Kalender", icon="event")
+        tasks_tab = ui.tab("Ämtli", icon="event")
         collab_tab = ui.tab("Kollaborations-Hub", icon="groups")
 
     # Tab-Inhalte werden in eigenen Containern gerendert.
