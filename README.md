@@ -5,7 +5,7 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 
 ## 2. Implementierte Kernfunktionen
 
-* **Mitbewohner\*innen-Verwaltung** – Vollständiges CRUD mit Tastatur-Unterstützung, farbkodierten Avataren und Inline-Bearbeitung.
+* **Mitbewohner\*innen-Verwaltung** – Hinzufügen, Bearbeiten und Löschen von Mitbewohner*innen mit farbkodierten Initialen-Avataren.
 
 * **Shared-Expense-Tracker** – Erfassung gemeinsamer Ausgaben mit:
   - Automatischer Anteilsberechnung (gleichmässige Aufteilung auf Beteiligte)
@@ -23,7 +23,7 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 
 * **Kollaborations-Hub** – WG-Blog (Schwarzes Brett) mit Reaktions-Emojis sowie eine Echtzeit-Einkaufsliste mit Auto-Sync alle 2 Sekunden.
 
-* **Authentifizierung & Profile** – Registrierung, Login, Passwort-Änderung, Avatar-Upload und Passwort-Reset-Flow.
+* **Nutzerprofile** – Mitbewohner\*in per Dropdown auswählen; Name und Profilbild im Einstellungs-Bereich anpassen.
 
 ## 3. Technische Architektur
 
@@ -43,7 +43,7 @@ Browser  ←→  NiceGUI-Server (main.py + ui/)  ←→  SQLAlchemy  ←→  DB
 
 - **`models.py`** – ORM-Datenmodelle (`MitbewohnerDB`, `Task`, `Expense`, `Post` etc.) und DB-Initialisierung
 - **`services.py`** – Reine Anwendungslogik; keinerlei NiceGUI-Abhängigkeiten, akzeptiert plain Python-Werte
-- **`auth_services.py`** – Authentifizierungslogik (Hashing, Tokens); ebenfalls UI-frei
+- **`auth_services.py`** – Nutzerverwaltung (Avatar, Profilabfrage); ebenfalls UI-frei
 - **`ui/`** – Alle NiceGUI-Komponenten; zuständig für Darstellung, Validierungsmeldungen (`ui.notify`) und User-Feedback
 
 Session-Management erfolgt durchgängig mit SQLAlchemy Context Managern (`with Session() as session:`). Schema-Migrationen werden via `sqlalchemy.inspect` abgesichert, sodass Spalten nur hinzugefügt werden, wenn sie fehlen.
@@ -66,9 +66,9 @@ Session-Management erfolgt durchgängig mit SQLAlchemy Context Managern (`with S
 - Als Mitbewohner\*in möchte ich Nachrichten im WG-Blog posten, um alle zu informieren.
 - Als Mitbewohner\*in möchte ich eine gemeinsame Einkaufsliste führen, die sich live aktualisiert.
 
-**Administration & Profil**
-- Als Nutzer\*in möchte ich mich registrieren und anmelden, damit mein Konto geschützt ist.
-- Als Nutzer\*in möchte ich mein Profilbild und meinen Namen anpassen.
+**Profil**
+- Als Mitbewohner\*in möchte ich meinen Namen im Einstellungs-Bereich anpassen können.
+- Als Mitbewohner\*in möchte ich ein Profilbild hochladen können.
 
 ## 5. Installation & Ausführung
 
@@ -100,28 +100,16 @@ Session-Management erfolgt durchgängig mit SQLAlchemy Context Managern (`with S
 | `DATABASE_URL` | `sqlite:///wg_planner.db` | DB-Verbindung (SQLite oder PostgreSQL) |
 | `STORAGE_SECRET` | *(dev-Wert)* | Secret für NiceGUI Session-Storage |
 
-## 6. Passwort vergessen (Entwicklungsmodus)
-
-Da in der lokalen Entwicklungsumgebung kein E-Mail-Dienst eingerichtet ist, wird der Reset-Link **nicht per E-Mail verschickt**, sondern direkt im Browser angezeigt:
-
-1. Gehe auf `/forgot-password` und gib deine E-Mail ein.
-2. Klicke auf „Link anfordern".
-3. Ein **blauer Info-Toast** erscheint auf derselben Seite mit dem kompletten Reset-Link.
-4. Kopiere den Pfad (`/reset-password?token=...`) und öffne ihn im Browser.
-
-> **Für ein echtes Deployment** muss ein E-Mail-Dienst (z.B. SendGrid, SMTP) in `ui/auth.py` → `do_reset()` eingebunden werden. Der Platzhalter-Kommentar `# In a real deployment, send this via email.` markiert die Stelle.
-
-## 7. Verwendete Bibliotheken
+## 6. Verwendete Bibliotheken
 
 | Bibliothek | Version | Zweck |
 |---|---|---|
 | **NiceGUI** | ≥ 1.4 | Server-seitiges UI-Framework (Vue.js/Quasar) |
 | **SQLAlchemy** | ≥ 2.0 | ORM & Datenbankabstraktion |
 | **Pydantic** | ≥ 2.0 | Datenvalidierung (FastAPI-Integration) |
-| **bcrypt** | – | Passwort-Hashing |
 | **FastAPI** | (via NiceGUI) | HTTP-Endpunkte |
 | **SQLite** / **PostgreSQL** | – | Persistenzschicht |
 
-## 8. Deployment (Render)
+## 7. Deployment (Render)
 
 Die Datei `render.yaml` enthält die Konfiguration für ein Deployment auf [Render](https://render.com). Dabei wird automatisch `DATABASE_URL` auf eine PostgreSQL-Instanz gesetzt – die Anwendung erkennt dies und wechselt vom SQLite-Modus.
