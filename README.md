@@ -14,7 +14,12 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
   - Manuell erfassbaren offenen Rechnungen
   - Kategorisierung inkl. Custom-Kategorien und Ausgabenverlauf
 
-* **Ämtli-Plan & Kalender** – Verwaltung von Haushaltsaufgaben mit Deadline-Tracking, interaktivem Kalender und Completion-Checkbox.
+* **Ämtli-Plan** – Verwaltung von Haushaltsaufgaben mit Deadline-Tracking und farbkodierter Statusansicht:
+  - **Abgelaufen** (rot): Deadline bereits überschritten
+  - **Bald fällig** (orange): Deadline innerhalb der nächsten 24 Stunden
+  - **Zu erledigen** (gelb): Offene Aufgaben mit zukünftiger Deadline
+  - **Erledigt** (grün): Abgehakte Aufgaben mit Erledigungsdatum
+  - Deadline-Badge (Wochentag + Datum) direkt auf jeder Aufgabenkarte
 
 * **Kollaborations-Hub** – WG-Blog (Schwarzes Brett) mit Reaktions-Emojis sowie eine Echtzeit-Einkaufsliste mit Auto-Sync alle 2 Sekunden.
 
@@ -53,6 +58,9 @@ Session-Management erfolgt durchgängig mit SQLAlchemy Context Managern (`with S
 **Ämtli & Organisation**
 - Als Mitbewohner\*in möchte ich ein Ämtli als "erledigt" markieren, damit andere den Status sehen.
 - Als Mitbewohner\*in möchte ich Aufgaben mit Deadlines versehen, damit nichts vergessen geht.
+- Als Mitbewohner\*in möchte ich abgelaufene Aufgaben sofort erkennen, damit ich sie priorisieren kann.
+- Als Mitbewohner\*in möchte ich sehen, welche Aufgaben in den nächsten 24 Stunden fällig sind.
+- Als Mitbewohner\*in möchte ich das Erledigungsdatum einer Aufgabe sehen, um den Fortschritt nachzuverfolgen.
 
 **Kommunikation**
 - Als Mitbewohner\*in möchte ich Nachrichten im WG-Blog posten, um alle zu informieren.
