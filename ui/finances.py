@@ -1,4 +1,4 @@
-from nicegui import ui
+from nicegui import app, ui
 from sqlalchemy.orm import joinedload, selectinload
 
 from models import Expense, ManualDebt, MitbewohnerDB
@@ -11,6 +11,7 @@ from services import (
     delete_expense,
     delete_manual_debts_by_pair,
     get_session,
+    is_settlement_category,
     save_expense,
     save_settlement,
     update_expense,
@@ -22,6 +23,13 @@ _PAYMENT_METHODS = ["Twint", "Bargeld", "Banküberweisung"]
 # Rendert den Finanz-Tab und liefert eine Refresh-Funktion fuer Neuaufbau.
 def render_finances_tab(container, current_user_id: int = None):
     _dialog_open = {"value": False}
+    _finance_version_key = "finances_version"
+    _known_finance_version = {"value": int(app.storage.general.get(_finance_version_key, 0))}
+
+    def _publish_finance_change() -> None:
+        next_version = int(app.storage.general.get(_finance_version_key, 0)) + 1
+        app.storage.general[_finance_version_key] = next_version
+        _known_finance_version["value"] = next_version
 
     # Liest aktuelle Daten, berechnet Kennzahlen und baut alle UI-Karten neu.
     def refresh():
@@ -48,8 +56,9 @@ def render_finances_tab(container, current_user_id: int = None):
                 .all()
             )
         user_names = {user.id: user.name for user in users}
-        total_spent = sum(e.amount for e in expenses)
-        expense_count = len(expenses)
+        regular_expenses = [expense for expense in expenses if not is_settlement_category(expense.category)]
+        total_spent = sum(expense.amount for expense in regular_expenses)
+        expense_count = len(regular_expenses)
 
         with container:
             # ── Hero-Banner ───────────────────────────────────────────────────
@@ -182,6 +191,7 @@ def render_finances_tab(container, current_user_id: int = None):
                         ui.notify("Ausgabe erfolgreich gespeichert", color="positive")
                         _dialog_open["value"] = False
                         expense_dialog.close()
+                        _publish_finance_change()
                         refresh()
 
                     def _check_parts():
@@ -278,6 +288,7 @@ def render_finances_tab(container, current_user_id: int = None):
                         ui.notify("Ausgabe aktualisiert", color="positive")
                         _dialog_open["value"] = False
                         edit_dialog.close()
+                        _publish_finance_change()
                         refresh()
 
                     with ui.row().classes("w-full justify-end gap-2 pt-2"):
@@ -396,10 +407,10 @@ def render_finances_tab(container, current_user_id: int = None):
                                     if s["from_id"] is None:
                                         return
                                     note = pay_note_input.value.strip()
-                                    _save_settlement(s["from_id"], s["to_id"], s["amount"], pay_method_sel.value, note)
-                                    pay_note_input.value = ""
                                     _dialog_open["value"] = False
                                     pay_dialog.close()
+                                    _save_settlement(s["from_id"], s["to_id"], s["amount"], pay_method_sel.value, note)
+                                    pay_note_input.value = ""
 
                                 with ui.row().classes("w-full justify-end gap-2"):
                                     ui.button("Abbrechen", on_click=lambda: (_dialog_open.update(value=False), pay_dialog.close())).props("flat")
@@ -422,6 +433,7 @@ def render_finances_tab(container, current_user_id: int = None):
                         ) -> None:
                             save_settlement(from_id, to_id, amount, method, note)
                             ui.notify(f"Ausgleich CHF {amount:.2f} via {method} erfasst", color="positive")
+                            _publish_finance_change()
                             refresh()
 
                         with ui.dialog().props("persistent") as manual_dialog, ui.card().classes(
@@ -465,6 +477,7 @@ def render_finances_tab(container, current_user_id: int = None):
                                     man_note.value = ""
                                     _dialog_open["value"] = False
                                     manual_dialog.close()
+                                    _publish_finance_change()
                                     refresh()
 
                                 with ui.row().classes("w-full justify-end gap-2"):
@@ -558,6 +571,7 @@ def render_finances_tab(container, current_user_id: int = None):
                                                     on_click=lambda fi=from_id, ti=to_id: (
                                                         delete_manual_debts_by_pair(fi, ti),
                                                         ui.notify("Ausgleich als bezahlt markiert", color="positive"),
+                                                        _publish_finance_change(),
                                                         refresh(),
                                                     ),
                                                 ).style(
@@ -611,8 +625,8 @@ def render_finances_tab(container, current_user_id: int = None):
                         with ui.row().classes("w-full items-center gap-2 px-4 pt-4 pb-2"):
                             ui.icon("receipt_long").style("color: #64748b; font-size: 1.3rem")
                             with ui.column().classes("gap-0"):
-                                ui.label("Ausgabenverlauf").classes("text-h6 font-bold")
-                                ui.label("Alle bisher erfassten gemeinsamen Ausgaben.").classes("text-sm text-gray-400")
+                                ui.label("Transaktionsverlauf").classes("text-h6 font-bold")
+                                ui.label("Ausgaben und Ausgleichszahlungen im zeitlichen Verlauf.").classes("text-sm text-gray-400")
                         with ui.column().classes("w-full gap-2 p-4 pt-2"):
                             if not expenses:
                                 with ui.element("div").style(
@@ -624,45 +638,71 @@ def render_finances_tab(container, current_user_id: int = None):
                                         "color: #94a3b8; margin-top: 8px; font-weight: 600"
                                     )
                             for expense in expenses:
+                                is_settlement = is_settlement_category(expense.category)
+                                icon_bg = "#eef2ff" if is_settlement else "#f0fdf4"
+                                icon_color = "#4f46e5" if is_settlement else "#059669"
+                                badge_classes = (
+                                    "text-xs px-2 py-0.5 rounded-full bg-indigo-50 "
+                                    "text-indigo-700 border border-indigo-100 w-fit"
+                                    if is_settlement
+                                    else "text-xs px-2 py-0.5 rounded-full bg-emerald-50 "
+                                    "text-emerald-700 border border-emerald-100 w-fit"
+                                )
+                                amount_color = "#4338ca" if is_settlement else "#065f46"
                                 with ui.card().classes("w-full border border-gray-100 shadow-sm rounded-xl"):
                                     with ui.row().classes("w-full justify-between items-center p-3"):
                                         with ui.row().classes("items-center gap-3"):
                                             with ui.element("div").style(
-                                                "background: #f0fdf4; border-radius: 10px; width: 40px; "
+                                                f"background: {icon_bg}; border-radius: 10px; width: 40px; "
                                                 "height: 40px; display: flex; align-items: center; "
                                                 "justify-content: center; flex-shrink: 0"
                                             ):
-                                                ui.icon("receipt").style("color: #059669; font-size: 1.2rem")
+                                                ui.icon("swap_horiz" if is_settlement else "receipt").style(
+                                                    f"color: {icon_color}; font-size: 1.2rem"
+                                                )
                                             with ui.column().classes("gap-0"):
                                                 ui.label(expense.description).classes("font-bold text-slate-800")
                                                 ui.label(expense.category or "Allgemein").classes(
-                                                    "text-xs px-2 py-0.5 rounded-full bg-emerald-50 "
-                                                    "text-emerald-700 border border-emerald-100 w-fit"
+                                                    badge_classes
                                                 )
                                         with ui.column().classes("items-end gap-0"):
                                             ui.label(f"CHF {expense.amount:.2f}").style(
-                                                "font-size: 1.1rem; font-weight: 800; color: #065f46"
+                                                f"font-size: 1.1rem; font-weight: 800; color: {amount_color}"
                                             )
                                             ui.label(
                                                 f"von {expense.paid_by.name if expense.paid_by else 'Unbekannt'}"
                                             ).classes("text-xs text-gray-400")
                                         with ui.row().classes("gap-0"):
-                                            ui.button(
-                                                icon="edit",
-                                                on_click=lambda e=expense: _open_edit_dialog(e),
-                                            ).props("flat round color=indigo")
+                                            if not is_settlement:
+                                                ui.button(
+                                                    icon="edit",
+                                                    on_click=lambda e=expense: _open_edit_dialog(e),
+                                                ).props("flat round color=indigo")
                                             ui.button(
                                                 icon="delete",
                                                 on_click=lambda e=expense: (
                                                     delete_expense(e.id),
-                                                    ui.notify("Ausgabe gelöscht", color="negative"),
+                                                    ui.notify(
+                                                        "Ausgleich gelöscht" if is_settlement_category(e.category) else "Ausgabe gelöscht",
+                                                        color="negative",
+                                                    ),
+                                                    _publish_finance_change(),
                                                     refresh(),
                                                 ),
                                             ).props("flat round color=red")
                                     ui.separator().classes("mx-3")
+                                    participant_label = "Empfängt: " if is_settlement else "Beteiligt: "
                                     ui.label(
-                                        f"Beteiligt: {', '.join(p.name for p in expense.participants)}"
+                                        f"{participant_label}{', '.join(p.name for p in expense.participants)}"
                                     ).classes("px-3 pb-3 pt-2 text-xs italic text-gray-500")
 
+    def refresh_if_changed() -> None:
+        current_version = int(app.storage.general.get(_finance_version_key, 0))
+        if current_version == _known_finance_version["value"] or _dialog_open["value"]:
+            return
+        _known_finance_version["value"] = current_version
+        refresh()
+
     refresh()
+    ui.timer(1.0, refresh_if_changed)
     return refresh

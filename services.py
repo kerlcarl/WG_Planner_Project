@@ -26,6 +26,8 @@ DEFAULT_EXPENSE_CATEGORIES = [
     "Sonstiges",
 ]
 
+SETTLEMENT_CATEGORY = "Ausgleich"
+
 
 @contextmanager
 def get_session():
@@ -98,10 +100,16 @@ def calculate_settlements() -> list[dict[str, float | int]]:
     return settlements
 
 
+def is_settlement_category(category: str | None) -> bool:
+    return (category or "").strip().casefold() == SETTLEMENT_CATEGORY.casefold()
+
+
 def calculate_category_totals() -> list[dict[str, float]]:
     with get_session() as session:
         totals: dict[str, float] = {}
         for expense in session.query(Expense).all():
+            if is_settlement_category(expense.category):
+                continue
             category = expense.category or "Sonstiges"
             totals[category] = totals.get(category, 0.0) + expense.amount
 
@@ -198,7 +206,7 @@ def save_settlement(from_id: int, to_id: int, amount: float, method: str, note: 
     """Erfasst einen Ausgleich als Expense und löscht zugehörige manuelle Schulden."""
     desc = note if note.strip() else f"Ausgleich via {method}"
     with get_session() as session:
-        expense = Expense(description=desc, amount=amount, category="Ausgleich", paid_by_id=from_id)
+        expense = Expense(description=desc, amount=amount, category=SETTLEMENT_CATEGORY, paid_by_id=from_id)
         to_user = session.get(MitbewohnerDB, to_id)
         if to_user:
             expense.participants.append(to_user)
