@@ -7,10 +7,6 @@ from auth_services import get_user_by_id
 from models import init_db, seed_db
 from services import assign_palette_colors, get_session
 from ui import (
-    register_forgot_password_page,
-    register_login_page,
-    register_register_page,
-    register_reset_password_page,
     register_select_user_page,
     register_settings_page,
     render_collab_tab,
@@ -362,12 +358,8 @@ async function reactToPost(postId, emoji, userId) {
     tabs.on("update:model-value", _on_tab_change)
 
 
-# Register auth + settings pages (must be called at module level)
+# Register pages (must be called at module level)
 register_select_user_page()
-register_login_page()
-register_register_page()
-register_forgot_password_page()
-register_reset_password_page()
 register_settings_page()
 
 

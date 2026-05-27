@@ -29,11 +29,7 @@ class MitbewohnerDB(Base):
     id: int = Column(Integer, primary_key=True)
     name: str = Column(String, nullable=False)
     color: str = Column(String, default='#336699')
-    email: str = Column(String, unique=True, nullable=True)
-    password_hash: str = Column(String, nullable=True)
     avatar_path: str = Column(String, nullable=True)
-    reset_token: str = Column(String, nullable=True)
-    reset_token_expires = Column(DateTime, nullable=True)
     
     # Relationships (Unit 7)
     # Ein User hat viele Aufgaben und viele bezahlte Ausgaben
@@ -181,11 +177,7 @@ def _migrate_sqlite() -> None:
     pending: list[tuple[str, str, str]] = [
         ('tasks', 'due_date', 'DATETIME'),
         ('tasks', 'completed_at', 'DATETIME'),
-        ('users', 'email', 'TEXT'),
-        ('users', 'password_hash', 'TEXT'),
         ('users', 'avatar_path', 'TEXT'),
-        ('users', 'reset_token', 'TEXT'),
-        ('users', 'reset_token_expires', 'DATETIME'),
     ]
     with engine.connect() as conn:
         for table, col, col_type in pending:
