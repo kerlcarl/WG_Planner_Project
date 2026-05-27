@@ -7,12 +7,12 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 
 ## 2. Implementierte Kernfunktionen
 
-### 👥 Mitbewohner\*innen-Verwaltung
+### Mitbewohner\*innen-Verwaltung
 - Hinzufügen, Bearbeiten und Löschen von Mitbewohner*innen
 - Farbkodierte Initialen-Avatare (automatische Farbzuweisung aus Palette)
 - Header-Avatar mit Dropdown-Menü (Einstellungen / Nutzer wechseln)
 
-### 💸 Shared-Expense-Tracker
+### Shared-Expense-Tracker
 - Erfassung gemeinsamer Ausgaben (Beschreibung, Betrag, Kategorie, Zahler, Beteiligte)
 - **Bearbeiten** bestehender Ausgaben per Edit-Dialog
 - Automatische Anteilsberechnung (gleichmässige Aufteilung auf Beteiligte)
@@ -24,7 +24,7 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 - Vollständiger Transaktionsverlauf (reguläre Ausgaben und Ausgleichszahlungen visuell unterschieden)
 - **Echtzeit-Sync zwischen Clients**: 1-Sekunden-Polling via gemeinsamem Versions-Zähler in `app.storage.general`
 
-### 🧹 Ämtli-Plan
+### Ämtli-Plan
 - Verwaltung von Haushaltsaufgaben mit Deadline-Tracking und farbkodierter Statusansicht:
   - **Abgelaufen** (rot): Deadline bereits überschritten
   - **Bald fällig** (orange): Deadline innerhalb der nächsten 24 Stunden
@@ -33,11 +33,11 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
 - Deadline-Badge (Wochentag + Datum) direkt auf jeder Aufgabenkarte
 - Ämtli bearbeiten und löschen
 
-### 💬 Kollaborations-Hub
+### Kollaborations-Hub
 - **WG-Blog** (Schwarzes Brett):
   - Nachrichten verfassen und löschen
   - Nachrichten als **„Wichtig"** markieren (roter „WICHTIG"-Badge + rote Hervorhebung)
-  - Reaktions-Emojis (👍 ❤️ 😂 😮 😢) mit Anzeige der reagierenden Personen per Tooltip
+  - Reaktions-Emojis (5 auswählbare Emojis) mit Anzeige der reagierenden Personen per Tooltip
   - Auto-Refresh alle **5 Sekunden**
 - **Einkaufsliste**:
   - Artikel mit optionaler **Menge + Einheit** erfassen (z.B. „Milch · 2 Liter")
@@ -45,12 +45,12 @@ Dieses Repository enthält den Code für den **WG‑Planner**, eine browserbasie
   - **Alle erledigten Artikel mit einem Klick löschen**
   - Auto-Sync alle **2 Sekunden**
 
-### 👤 Nutzerprofile
+### Nutzerprofile
 - Mitbewohner*in per Dropdown auswählen (Startseite `/select-user`)
 - Name im Einstellungs-Bereich anpassen
 - Profilbild hochladen (JPG/PNG, max. 2 MB)
 
-### 📱 UI & Responsivität
+### UI & Responsivität
 - **Swipe-Gesten** für Tab-Navigation (Touch & Maus-Drag mit Rubber-Band-Effekt an den Rändern)
 - **Responsives Grid-Layout**: 3-spaltig → 2-spaltig (≤ 1200 px) → 1-spaltig (≤ 800 px)
 - Alle Haupt-Tabs (Mitbewohner, Finanzen, Ämtli) **Auto-Refresh alle 10 Sekunden**
@@ -80,11 +80,11 @@ Session-Management erfolgt durchgängig mit SQLAlchemy Context Managern (`with S
 
 ```mermaid
 graph TD
-    Browser["🌐 Browser\nVue.js / Quasar"]
+    Browser["Browser\nVue.js / Quasar"]
 
-    subgraph Server ["🐍 NiceGUI-Server"]
+    subgraph Server ["NiceGUI-Server"]
         main["main.py\nRoutes · Page-Setup · Swipe-JS"]
-        subgraph UI ["ui/  —  Präsentationsschicht"]
+        subgraph UI ["ui/ — Präsentationsschicht"]
             auth["auth.py\nSelect-User"]
             finances["finances.py\nFinanz-Tab"]
             tasks["tasks.py\nÄmtli-Tab"]
@@ -98,7 +98,7 @@ graph TD
         end
     end
 
-    subgraph DB ["💾 Persistenzschicht"]
+    subgraph DB ["Persistenzschicht"]
         orm["SQLAlchemy ORM\nmodels.py"]
         sqlite[("SQLite\nlokal")]
         postgres[("PostgreSQL\nRender")]
@@ -120,9 +120,9 @@ graph TD
 
 ```mermaid
 flowchart LR
-    MW(("👤\nMitbewohner*in"))
+    MW(("Mitbewohner*in"))
 
-    subgraph FIN ["💸 Finanzen"]
+    subgraph FIN ["Finanzen"]
         F1("Ausgabe erfassen")
         F2("Ausgabe bearbeiten / löschen")
         F3("Kontostand einsehen")
@@ -131,14 +131,14 @@ flowchart LR
         F6("Kategorien analysieren")
     end
 
-    subgraph AEM ["🧹 Ämtli"]
+    subgraph AEM ["Ämtli"]
         A1("Ämtli erstellen")
         A2("Ämtli bearbeiten / löschen")
         A3("Als erledigt markieren")
         A4("Statusübersicht einsehen")
     end
 
-    subgraph COLLAB ["💬 Kollaborations-Hub"]
+    subgraph COLLAB ["Kollaborations-Hub"]
         C1("Nachricht posten")
         C2("Nachricht als wichtig markieren")
         C3("Reaktion setzen")
@@ -146,7 +146,7 @@ flowchart LR
         C5("Artikel abhaken / löschen")
     end
 
-    subgraph PROFIL ["👤 Profil"]
+    subgraph PROFIL ["Profil"]
         P1("Nutzer*in auswählen")
         P2("Mitbewohner*in verwalten")
         P3("Namen anpassen")
