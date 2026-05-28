@@ -55,6 +55,7 @@ def render_finances_tab(container, current_user_id: int = None):
                 .order_by(ManualDebt.created_at.desc())
                 .all()
             )
+        valid_user_id = current_user_id if any(u.id == current_user_id for u in users) else (users[0].id if users else None)
         user_names = {user.id: user.name for user in users}
         regular_expenses = [expense for expense in expenses if not is_settlement_category(expense.category)]
         total_spent = sum(expense.amount for expense in regular_expenses)
@@ -137,7 +138,7 @@ def render_finances_tab(container, current_user_id: int = None):
                     ):
                         with ui.column().classes("w-full gap-3 p-4"):
                             ui.label("Bezahlt von").classes("text-sm font-medium text-slate-700")
-                            payer = ui.radio({user.id: user.name for user in users}, value=current_user_id).classes("w-full")
+                            payer = ui.radio({user.id: user.name for user in users}, value=valid_user_id).classes("w-full")
 
                     with ui.card().classes(
                         "w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"
@@ -235,7 +236,7 @@ def render_finances_tab(container, current_user_id: int = None):
                     with ui.card().classes("w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"):
                         with ui.column().classes("w-full gap-3 p-4"):
                             ui.label("Bezahlt von").classes("text-sm font-medium text-slate-700")
-                            edit_payer = ui.radio({user.id: user.name for user in users}, value=current_user_id).classes("w-full")
+                            edit_payer = ui.radio({user.id: user.name for user in users}, value=valid_user_id).classes("w-full")
 
                     with ui.card().classes("w-full bg-slate-50 border border-slate-200 rounded-xl shadow-none"):
                         with ui.column().classes("w-full gap-3 p-4"):
@@ -449,7 +450,7 @@ def render_finances_tab(container, current_user_id: int = None):
                             with ui.column().classes("w-full gap-4 px-5 pb-5 pt-2"):
                                 with ui.row().classes("w-full gap-4"):
                                     man_from = ui.select(
-                                        {u.id: u.name for u in users}, label="Wer bezahlt?", value=current_user_id,
+                                        {u.id: u.name for u in users}, label="Wer bezahlt?", value=valid_user_id,
                                     ).classes("w-full")
                                     man_to = ui.select(
                                         {u.id: u.name for u in users}, label="Wer erhält?",
