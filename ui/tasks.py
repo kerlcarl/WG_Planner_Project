@@ -24,6 +24,7 @@ def render_tasks_tab(container, current_user_id: int = None):
 
         now = datetime.now()
         today_str = now.strftime("%Y/%m/%d")
+        valid_user_id = current_user_id if any(u.id == current_user_id for u in users) else (users[0].id if users else None)
         cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
         soon_cutoff = now + timedelta(hours=24)
         datum_label = f"{_WOCHENTAGE_LANG[now.weekday()]}, {now.strftime('%d.%m.%Y')}"
@@ -293,7 +294,7 @@ def render_tasks_tab(container, current_user_id: int = None):
                         who = ui.select(
                             {user.id: user.name for user in users},
                             label="Zuständige*r Mitbewohner*in",
-                            value=current_user_id,
+                            value=valid_user_id,
                         ).classes("w-full mt-2")
 
                         with ui.input("Deadline (optional)", placeholder="TT.MM.JJJJ") as deadline:
